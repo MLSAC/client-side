@@ -1,3 +1,26 @@
+/*
+ * This file is part of MLSAC - AI powered Anti-Cheat
+ * Copyright (C) 2026 MLSAC Team
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * This file contains code derived from:
+ *   - SlothAC (© 2025 KaelusMC, https://github.com/KaelusMC/SlothAC)
+ *   - Grim (© 2025 GrimAnticheat, https://github.com/GrimAnticheat/Grim)
+ * All derived code is licensed under GPL-3.0.
+ */
+
 package wtf.mlsac.violation;
 
 import org.bukkit.entity.Player;
@@ -23,6 +46,7 @@ public class ViolationManager {
     
     private static final int MAX_KICK_HISTORY = 10;
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final long PUNISHMENT_COOLDOWN_MS = 5000; // 5 секунд между командами
     
     private final Main plugin;
     private final AlertManager alertManager;
@@ -30,6 +54,7 @@ public class ViolationManager {
     private final Map<UUID, Integer> violationLevels;
     private final LinkedList<KickRecord> kickHistory;
     private final PenaltyExecutor penaltyExecutor;
+    private final Map<UUID, Long> lastPunishmentTime;
     
     private Config config;
     
@@ -70,6 +95,7 @@ public class ViolationManager {
         this.violationLevels = new ConcurrentHashMap<>();
         this.kickHistory = new LinkedList<>();
         this.penaltyExecutor = new PenaltyExecutor(plugin);
+        this.lastPunishmentTime = new ConcurrentHashMap<>();
         
         updatePenaltyExecutorConfig();
     }
@@ -91,6 +117,15 @@ public class ViolationManager {
         }
         
         UUID uuid = player.getUniqueId();
+        
+        // Защита от дублирования команд - cooldown между наказаниями
+        long now = System.currentTimeMillis();
+        Long lastTime = lastPunishmentTime.get(uuid);
+        if (lastTime != null && (now - lastTime) < PUNISHMENT_COOLDOWN_MS) {
+            plugin.debug("[AI] " + player.getName() + " punishment on cooldown, skipping");
+            return;
+        }
+        
         int newVl = incrementViolationLevel(uuid);
         
         alertManager.sendAlert(player.getName(), probability, buffer, newVl);
@@ -101,6 +136,7 @@ public class ViolationManager {
         
         String command = getApplicablePunishmentCommand(newVl);
         if (command != null) {
+            lastPunishmentTime.put(uuid, now);
             executeCommand(command, player, probability, buffer, newVl);
         }
     }
@@ -175,6 +211,7 @@ public class ViolationManager {
     }
     
     public void handlePlayerQuit(Player player) {
+        lastPunishmentTime.remove(player.getUniqueId());
     }
     
     public void decreaseViolationLevel(UUID playerId, int amount) {
@@ -186,6 +223,7 @@ public class ViolationManager {
     
     public void clearAll() {
         violationLevels.clear();
+        lastPunishmentTime.clear();
         synchronized (this) {
             kickHistory.clear();
         }
