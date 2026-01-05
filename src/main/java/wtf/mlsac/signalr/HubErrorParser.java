@@ -52,8 +52,20 @@ public class HubErrorParser {
         try {
             JsonObject obj = GSON.fromJson(json, JsonObject.class);
             
-            String code = obj.has("code") ? obj.get("code").getAsString() : INTERNAL_ERROR;
-            String message = obj.has("message") ? obj.get("message").getAsString() : exceptionMessage;
+            // Поддержка обоих форматов: "code"/"Code" и "message"/"Message"
+            String code = INTERNAL_ERROR;
+            if (obj.has("code")) {
+                code = obj.get("code").getAsString();
+            } else if (obj.has("Code")) {
+                code = obj.get("Code").getAsString();
+            }
+            
+            String message = exceptionMessage;
+            if (obj.has("message")) {
+                message = obj.get("message").getAsString();
+            } else if (obj.has("Message")) {
+                message = obj.get("Message").getAsString();
+            }
             
             return new HubError(code, message);
         } catch (JsonSyntaxException e) {

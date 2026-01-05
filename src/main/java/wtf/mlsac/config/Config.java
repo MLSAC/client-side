@@ -79,6 +79,10 @@ public class Config {
     private final String serverAddress;
     private final int reportStatsIntervalSeconds;
     
+    private final boolean vlDecayEnabled;
+    private final int vlDecayIntervalSeconds;
+    private final int vlDecayAmount;
+    
     public static final boolean DEFAULT_DEBUG = false;
     public static final String DEFAULT_OUTPUT_DIRECTORY = "plugins/MLSAC/data";
     
@@ -123,6 +127,10 @@ public class Config {
     
     public static final String DEFAULT_SERVER_ADDRESS = "https://localhost";
     public static final int DEFAULT_REPORT_STATS_INTERVAL_SECONDS = 30;
+    
+    public static final boolean DEFAULT_VL_DECAY_ENABLED = true;
+    public static final int DEFAULT_VL_DECAY_INTERVAL_SECONDS = 60;
+    public static final int DEFAULT_VL_DECAY_AMOUNT = 1;
 
     public Config() {
         this.debug = DEFAULT_DEBUG;
@@ -164,6 +172,10 @@ public class Config {
         
         this.serverAddress = DEFAULT_SERVER_ADDRESS;
         this.reportStatsIntervalSeconds = DEFAULT_REPORT_STATS_INTERVAL_SECONDS;
+        
+        this.vlDecayEnabled = DEFAULT_VL_DECAY_ENABLED;
+        this.vlDecayIntervalSeconds = DEFAULT_VL_DECAY_INTERVAL_SECONDS;
+        this.vlDecayAmount = DEFAULT_VL_DECAY_AMOUNT;
     }
     
     private static Set<String> createDefaultCheatReasons() {
@@ -284,6 +296,10 @@ public class Config {
         this.serverAddress = config.getString("detection.endpoint", 
             config.getString("ai.server", DEFAULT_SERVER_ADDRESS));
         this.reportStatsIntervalSeconds = DEFAULT_REPORT_STATS_INTERVAL_SECONDS;
+        
+        this.vlDecayEnabled = config.getBoolean("violation.vl-decay.enabled", DEFAULT_VL_DECAY_ENABLED);
+        this.vlDecayIntervalSeconds = config.getInt("violation.vl-decay.interval", DEFAULT_VL_DECAY_INTERVAL_SECONDS);
+        this.vlDecayAmount = config.getInt("violation.vl-decay.amount", DEFAULT_VL_DECAY_AMOUNT);
     }
 
     private double clampThreshold(double value, String configPath, Logger logger) {
@@ -397,4 +413,8 @@ public class Config {
         }
         return 5000;
     }
+    
+    public boolean isVlDecayEnabled() { return vlDecayEnabled; }
+    public int getVlDecayIntervalSeconds() { return vlDecayIntervalSeconds; }
+    public int getVlDecayAmount() { return vlDecayAmount; }
 }

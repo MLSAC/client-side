@@ -23,11 +23,15 @@
 
 package wtf.mlsac.violation;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 
 import wtf.mlsac.Main;
 import wtf.mlsac.alert.AlertManager;
+import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.config.Config;
+import wtf.mlsac.data.AIPlayerData;
 import wtf.mlsac.penalty.PenaltyContext;
 import wtf.mlsac.penalty.PenaltyExecutor;
 
@@ -57,6 +61,8 @@ public class ViolationManager {
     private final Map<UUID, Long> lastPunishmentTime;
     
     private Config config;
+    private AICheck aiCheck;
+    private BukkitTask decayTask;
     
     public static class KickRecord {
         private final String playerName;
@@ -98,6 +104,61 @@ public class ViolationManager {
         this.lastPunishmentTime = new ConcurrentHashMap<>();
         
         updatePenaltyExecutorConfig();
+        startDecayTask();
+    }
+    
+    public void setAICheck(AICheck aiCheck) {
+        this.aiCheck = aiCheck;
+    }
+    
+    private void startDecayTask() {
+        stopDecayTask();
+        
+        if (!config.isVlDecayEnabled()) {
+            return;
+        }
+        
+        int intervalTicks = config.getVlDecayIntervalSeconds() * 20;
+        
+        decayTask = Bukkit.getScheduler().runTaskTimer(plugin, this::processDecay, intervalTicks, intervalTicks);
+        plugin.debug("[VL] Decay task started with interval " + config.getVlDecayIntervalSeconds() + "s");
+    }
+    
+    private void stopDecayTask() {
+        if (decayTask != null) {
+            decayTask.cancel();
+            decayTask = null;
+        }
+    }
+    
+    private void processDecay() {
+        if (aiCheck == null) {
+            return;
+        }
+        
+        int decayAmount = config.getVlDecayAmount();
+        
+        for (Map.Entry<UUID, Integer> entry : violationLevels.entrySet()) {
+            UUID playerId = entry.getKey();
+            
+            // Проверяем что игрок не в бою
+            AIPlayerData playerData = aiCheck.getPlayerData(playerId);
+            if (playerData != null && playerData.isInCombat()) {
+                continue; // Игрок в бою - не снимаем VL
+            }
+            
+            // Игрок не в бою - снимаем VL
+            int oldVl = entry.getValue();
+            int newVl = oldVl - decayAmount;
+            
+            if (newVl <= 0) {
+                violationLevels.remove(playerId);
+                plugin.debug("[VL] Decay: removed VL for " + playerId + " (was " + oldVl + ")");
+            } else {
+                violationLevels.put(playerId, newVl);
+                plugin.debug("[VL] Decay: " + playerId + " VL " + oldVl + " -> " + newVl);
+            }
+        }
     }
     
     private void updatePenaltyExecutorConfig() {
@@ -109,6 +170,7 @@ public class ViolationManager {
     public void setConfig(Config config) {
         this.config = config;
         updatePenaltyExecutorConfig();
+        startDecayTask(); // Перезапускаем decay task с новыми настройками
     }
     
     public void handleFlag(Player player, double probability, double buffer) {
@@ -117,13 +179,17 @@ public class ViolationManager {
         }
         
         UUID uuid = player.getUniqueId();
-        
-        // Защита от дублирования команд - cooldown между наказаниями
         long now = System.currentTimeMillis();
-        Long lastTime = lastPunishmentTime.get(uuid);
-        if (lastTime != null && (now - lastTime) < PUNISHMENT_COOLDOWN_MS) {
-            plugin.debug("[AI] " + player.getName() + " punishment on cooldown, skipping");
-            return;
+        
+        // Атомарная проверка cooldown - защита от дублирования команд
+        Long previousTime = lastPunishmentTime.putIfAbsent(uuid, now);
+        if (previousTime != null) {
+            if ((now - previousTime) < PUNISHMENT_COOLDOWN_MS) {
+                plugin.debug("[AI] " + player.getName() + " punishment on cooldown, skipping");
+                return;
+            }
+            // Cooldown прошёл, обновляем время
+            lastPunishmentTime.put(uuid, now);
         }
         
         int newVl = incrementViolationLevel(uuid);
@@ -136,7 +202,6 @@ public class ViolationManager {
         
         String command = getApplicablePunishmentCommand(newVl);
         if (command != null) {
-            lastPunishmentTime.put(uuid, now);
             executeCommand(command, player, probability, buffer, newVl);
         }
     }
@@ -230,6 +295,7 @@ public class ViolationManager {
     }
     
     public void shutdown() {
+        stopDecayTask();
         clearAll();
         penaltyExecutor.shutdown();
     }

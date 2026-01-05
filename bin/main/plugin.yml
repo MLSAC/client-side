@@ -1,0 +1,25 @@
+name: MLSAC
+version: '${version}'
+main: wtf.mlsac.Main
+api-version: '1.16'
+description: "MLSAC.WTF - Buy API"
+
+commands:
+  mlsac:
+    description: MLSAC anticheat and data collection commands
+    usage: |
+      /mlsac start <NICK> <CHEAT|LEGIT|UNLABELED> "<comment>"
+      /mlsac stop <NICK>
+      /mlsac alerts - Toggle alerts
+      /mlsac prob <player> - Show player probability
+      /mlsac reload - Reload config
+    permission: mlsac.admin
+    aliases: [ml]
+
+permissions:
+  mlsac.admin:
+    description: Allows use of all MLSAC commands
+    default: op
+  mlsac.alerts:
+    description: Allows toggling AI alerts
+    default: op

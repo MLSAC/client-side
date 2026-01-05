@@ -90,6 +90,14 @@ public class AICheck {
         }
         
         AIPlayerData data = getOrCreatePlayerData(player);
+        
+        // Если это новый бой (игрок не был в бою) - очищаем старые данные
+        if (!data.isInCombat()) {
+            data.clearBuffer();
+            data.getAimProcessor().reset();
+            plugin.debug("[AI] New combat started for " + player.getName() + ", cleared old data");
+        }
+        
         data.onAttack();
         
         plugin.debug("[AI] Attack registered for " + player.getName() + 
@@ -137,7 +145,8 @@ public class AICheck {
             return;
         }
         
-        if (data.getTicksSinceAttack() > sequence) {
+        // Не собираем данные если игрок не в бою
+        if (!data.isInCombat()) {
             return;
         }
         

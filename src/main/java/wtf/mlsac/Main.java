@@ -91,6 +91,7 @@ public final class Main extends JavaPlugin {
         this.alertManager = new AlertManager(this, config);
         this.violationManager = new ViolationManager(this, config, alertManager);
         this.aiCheck = new AICheck(this, config, aiClientProvider, alertManager, violationManager);
+        this.violationManager.setAICheck(aiCheck);
         
         if (config.isAiEnabled()) {
             aiClientProvider.initialize().thenAccept(success -> {
