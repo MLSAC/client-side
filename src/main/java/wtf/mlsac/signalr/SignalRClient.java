@@ -55,6 +55,7 @@ public class SignalRClient implements IAIClient {
     
     private SignalRSessionManager sessionManager;
     private SignalRReportStatsScheduler reportStatsScheduler;
+    private SignalRHeartbeatScheduler heartbeatScheduler;
     private SignalREndpointConfig endpointConfig;
     
     private String pluginHash;
@@ -111,6 +112,10 @@ public class SignalRClient implements IAIClient {
                     logger.info("[SignalR] Online limit cleared - Predict enabled"));
                 reportStatsScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
                 reportStatsScheduler.start(reportStatsIntervalSeconds);
+                
+                this.heartbeatScheduler = new SignalRHeartbeatScheduler(plugin, sessionManager);
+                heartbeatScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+                heartbeatScheduler.start();
                 
                 connected = true;
                 reconnectAttempts.set(0);
@@ -170,6 +175,10 @@ public class SignalRClient implements IAIClient {
         
         return CompletableFuture.runAsync(() -> {
             try {
+                if (heartbeatScheduler != null) {
+                    heartbeatScheduler.stop();
+                }
+                
                 if (reportStatsScheduler != null) {
                     reportStatsScheduler.stop();
                 }
@@ -207,6 +216,10 @@ public class SignalRClient implements IAIClient {
         
         if (reportStatsScheduler != null) {
             reportStatsScheduler.stop();
+        }
+        
+        if (heartbeatScheduler != null) {
+            heartbeatScheduler.stop();
         }
         
         scheduleReconnect();

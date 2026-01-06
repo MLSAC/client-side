@@ -67,7 +67,8 @@ public class SignalRReportStatsScheduler {
         
         logger.info("[SignalR] ReportStats scheduler started (interval: " + intervalSeconds + "s)");
         
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, this::reportNow);
+        // Small delay to ensure session is fully established before first report
+        Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, this::reportNow, 20L);
     }
     
     public void stop() {
@@ -79,6 +80,12 @@ public class SignalRReportStatsScheduler {
     }
 
     public CompletableFuture<SignalRSessionManager.ReportStatsResult> reportNow() {
+        // Skip if session is not valid - avoid spamming logs during reconnection
+        if (!sessionManager.isSessionValid()) {
+            return CompletableFuture.completedFuture(
+                new SignalRSessionManager.ReportStatsResult(false, false, 0, "No active session"));
+        }
+        
         int onlinePlayers = onlinePlayersSupplier.getAsInt();
         
         return sessionManager.reportStats(onlinePlayers)
@@ -102,14 +109,16 @@ public class SignalRReportStatsScheduler {
                     }
                 } else {
                     String error = result.getError();
-                    logger.warning("[SignalR] ReportStats failed: " + error);
                     
+                    // Only log and handle if it's an authentication error, not just "No active session"
                     if (error != null && error.contains("NOT_AUTHENTICATED")) {
+                        logger.warning("[SignalR] ReportStats failed: " + error);
                         logger.info("[SignalR] Session expired, triggering re-authentication...");
                         if (onSessionExpiredCallback != null) {
                             onSessionExpiredCallback.run();
                         }
                     }
+                    // Don't log "No active session" - it's expected during reconnection
                 }
                 
                 return result;
