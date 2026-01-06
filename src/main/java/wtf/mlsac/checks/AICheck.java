@@ -104,6 +104,18 @@ public class AICheck {
             ", buffer=" + data.getBufferSize() + "/" + sequence);
     }
     
+    public void onTeleport(Player player) {
+        if (!config.isAiEnabled()) {
+            return;
+        }
+        
+        AIPlayerData data = playerData.get(player.getUniqueId());
+        if (data != null) {
+            data.onTeleport();
+            plugin.debug("[AI] Teleport registered for " + player.getName() + ", resetting data");
+        }
+    }
+    
     public void onTick(Player player) {
         if (!config.isAiEnabled()) {
             return;

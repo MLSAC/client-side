@@ -79,6 +79,11 @@ public class AIPlayerData {
         this.ticksSinceAttack = 0;
     }
     
+    public void onTeleport() {
+        aimProcessor.reset();
+        clearBuffer();
+    }
+    
     public void incrementTicksSinceAttack() {
         if (this.ticksSinceAttack <= sequence + 1) {
             this.ticksSinceAttack++;

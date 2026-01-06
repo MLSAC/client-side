@@ -34,6 +34,7 @@ import wtf.mlsac.datacollector.DataCollectorFactory;
 import wtf.mlsac.listeners.HitListener;
 import wtf.mlsac.listeners.PlayerListener;
 import wtf.mlsac.listeners.RotationListener;
+import wtf.mlsac.listeners.TeleportListener;
 import wtf.mlsac.listeners.TickListener;
 import wtf.mlsac.server.AIClientProvider;
 import wtf.mlsac.session.ISessionManager;
@@ -55,6 +56,7 @@ public final class Main extends JavaPlugin {
     private HitListener hitListener;
     private RotationListener rotationListener;
     private PlayerListener playerListener;
+    private TeleportListener teleportListener;
     private CommandHandler commandHandler;
     
     // AI Anticheat components
@@ -108,11 +110,13 @@ public final class Main extends JavaPlugin {
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
         this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager, 
             sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null);
+        this.teleportListener = new TeleportListener(aiCheck);
         
         this.tickListener.setHitListener(hitListener);
         
         getServer().getPluginManager().registerEvents(tickListener, this);
         getServer().getPluginManager().registerEvents(playerListener, this);
+        getServer().getPluginManager().registerEvents(teleportListener, this);
         
         PacketEvents.getAPI().getEventManager().registerListener(hitListener);
         PacketEvents.getAPI().getEventManager().registerListener(rotationListener);
