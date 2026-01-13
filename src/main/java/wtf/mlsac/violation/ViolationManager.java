@@ -32,6 +32,7 @@ import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.config.Config;
 import wtf.mlsac.data.AIPlayerData;
+import wtf.mlsac.penalty.ActionType;
 import wtf.mlsac.penalty.PenaltyContext;
 import wtf.mlsac.penalty.PenaltyExecutor;
 
@@ -179,15 +180,6 @@ public class ViolationManager {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
         
-        Long previousTime = lastPunishmentTime.putIfAbsent(uuid, now);
-        if (previousTime != null) {
-            if ((now - previousTime) < PUNISHMENT_COOLDOWN_MS) {
-                plugin.debug("[AI] " + player.getName() + " punishment on cooldown, skipping");
-                return;
-            }
-            lastPunishmentTime.put(uuid, now);
-        }
-        
         int newVl = incrementViolationLevel(uuid);
         
         alertManager.sendAlert(player.getName(), probability, buffer, newVl);
@@ -198,6 +190,19 @@ public class ViolationManager {
         
         String command = getApplicablePunishmentCommand(newVl);
         if (command != null) {
+            // Check if this is a real punishment (BAN/KICK) that needs cooldown
+            ActionType actionType = ActionType.fromCommand(command);
+            
+            if (actionType.isPunishment()) {
+                // Apply cooldown only for real punishments
+                Long previousTime = lastPunishmentTime.get(uuid);
+                if (previousTime != null && (now - previousTime) < PUNISHMENT_COOLDOWN_MS) {
+                    plugin.debug("[AI] " + player.getName() + " punishment on cooldown, skipping " + actionType);
+                    return;
+                }
+                lastPunishmentTime.put(uuid, now);
+            }
+            
             executeCommand(command, player, probability, buffer, newVl);
         }
     }

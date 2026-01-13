@@ -129,12 +129,15 @@ public class AICheck {
         data.incrementTicksSinceAttack();
         
         if (data.getTicksSinceAttack() > sequence) {
-            if (data.getBufferSize() >= sequence) {
+            // Don't send if there's already a pending request
+            if (!data.isPendingRequest() && data.getBufferSize() >= sequence) {
                 plugin.debug("[AI] Combat ended for " + player.getName() + 
                     ", sending final buffer (" + data.getBufferSize() + " ticks)");
+                data.setPendingRequest(true);
                 sendDataToAI(player, data);
             }
-            if (data.getBufferSize() > 0) {
+            // Only clear buffer if combat truly ended and no pending request
+            if (!data.isPendingRequest() && data.getTicksSinceAttack() > sequence * 2 && data.getBufferSize() > 0) {
                 data.clearBuffer();
             }
             data.resetStepCounter();
@@ -165,9 +168,10 @@ public class AICheck {
         data.incrementStepCounter();
         
         if (data.shouldSendData(step, sequence)) {
+            data.setPendingRequest(true);
             sendDataToAI(player, data);
             data.resetStepCounter();
-            data.clearBuffer();
+            // Don't clear buffer here - will be cleared after response is processed
         }
     }
 
@@ -213,7 +217,7 @@ public class AICheck {
         client.predict(serialized, playerUuid.toString())
             .thenAccept(response -> processResponse(playerUuid, playerName, data, response))
             .exceptionally(error -> {
-                handleError(playerName, error);
+                handleError(playerName, data, error);
                 return null;
             });
     }
@@ -223,6 +227,10 @@ public class AICheck {
     }
     
     private void processResponse(UUID playerUuid, String playerName, AIPlayerData data, AIResponse response) {
+        // Clear pending flag and buffer after receiving response
+        data.setPendingRequest(false);
+        data.clearBuffer();
+        
         if (response.getError() != null && response.getError().contains("INVALID_SEQUENCE")) {
             handleInvalidSequence(response.getError());
             return;
@@ -270,7 +278,11 @@ public class AICheck {
         }
     }
     
-    private void handleError(String playerName, Throwable error) {
+    private void handleError(String playerName, AIPlayerData data, Throwable error) {
+        // Clear pending flag on error so player can be checked again
+        if (data != null) {
+            data.setPendingRequest(false);
+        }
         Throwable cause = error.getCause() != null ? error.getCause() : error;
         logger.warning("[AI] Error for " + playerName + ": " + cause.getMessage());
     }

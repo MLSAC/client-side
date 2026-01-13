@@ -45,8 +45,10 @@ public class AIPlayerData {
     
     private int ticksStep;
     
-    private double buffer;
-    private double lastProbability;
+    private volatile double buffer;
+    private volatile double lastProbability;
+    
+    private volatile boolean pendingRequest;
     
     public AIPlayerData(UUID playerId) {
         this(playerId, 40);
@@ -61,6 +63,7 @@ public class AIPlayerData {
         this.ticksStep = 0;
         this.buffer = 0.0;
         this.lastProbability = 0.0;
+        this.pendingRequest = false;
     }
 
     public TickData processTick(float yaw, float pitch) {
@@ -105,7 +108,15 @@ public class AIPlayerData {
     }
     
     public boolean shouldSendData(int step, int sequence) {
-        return ticksStep >= step && tickBuffer.size() >= sequence;
+        return !pendingRequest && ticksStep >= step && tickBuffer.size() >= sequence;
+    }
+    
+    public void setPendingRequest(boolean pending) {
+        this.pendingRequest = pending;
+    }
+    
+    public boolean isPendingRequest() {
+        return pendingRequest;
     }
     
     @Deprecated
@@ -128,6 +139,7 @@ public class AIPlayerData {
     public void fullReset() {
         tickBuffer.clear();
         aimProcessor.reset();
+        pendingRequest = false;
     }
     
     public boolean isInCombat() {
@@ -146,21 +158,21 @@ public class AIPlayerData {
         return ticksSinceAttack;
     }
     
-    public void updateBuffer(double probability, double multiplier, double decreaseAmount, double threshold) {
+    public synchronized void updateBuffer(double probability, double multiplier, double decreaseAmount, double threshold) {
         this.lastProbability = probability;
         this.buffer = BufferCalculator.updateBuffer(buffer, probability, multiplier, decreaseAmount, threshold);
     }
     
-    public boolean shouldFlag(double flagThreshold) {
+    public synchronized boolean shouldFlag(double flagThreshold) {
         return BufferCalculator.shouldFlag(buffer, flagThreshold);
     }
     
-    public void resetBuffer(double resetValue) {
+    public synchronized void resetBuffer(double resetValue) {
         this.buffer = BufferCalculator.resetBuffer(resetValue);
     }
     
     public UUID getPlayerId() { return playerId; }
-    public double getBuffer() { return buffer; }
+    public synchronized double getBuffer() { return buffer; }
     public double getLastProbability() { return lastProbability; }
     public AimProcessor getAimProcessor() { return aimProcessor; }
 }

@@ -39,7 +39,7 @@ detection:
 
 alerts:
   # Probability threshold for sending alerts (0.0 - 1.0) - lowered for early notification
-  threshold: 0.70
+  threshold: 0.75
   
   # Send alerts to console
   console: true
@@ -56,7 +56,7 @@ violation:
   reset-value: 10  
   # Buffer increase multiplier: (probability - threshold) * multiplier
   # Example: prob 1.0 with threshold 0.70 = (1.0 - 0.70) * 33.33 = 10 buffer
-  multiplier: 33.33
+  multiplier: 50
   
   # Buffer decay when probability < 0.1 (low probability threshold)
   decay: 0.35

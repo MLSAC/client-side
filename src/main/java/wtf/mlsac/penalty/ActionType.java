@@ -72,4 +72,12 @@ public enum ActionType {
     public boolean isConsoleCommand() {
         return this == BAN || this == KICK || this == RAW;
     }
+    
+    /**
+     * Returns true if this action type is a real punishment that should trigger cooldown.
+     * CUSTOM_ALERT is not a punishment, just a notification.
+     */
+    public boolean isPunishment() {
+        return this == BAN || this == KICK;
+    }
 }
