@@ -1,0 +1,163 @@
+# ╔═══════════════════════════════════════════════════════════════════════════════╗
+# ║                           MLSAC Configuration                                 ║
+# ║                    ML Anti-Cheat with AI Detection                            ║
+# ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                            GENERAL SETTINGS                                   │
+# └───────────────────────────────────────────────────────────────────────────────┘
+
+# Enable debug mode for additional console output
+debug: false
+
+# Directory for saving data files
+outputDirectory: "data"
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                            DETECTION SETTINGS                                 │
+# └───────────────────────────────────────────────────────────────────────────────┘
+
+detection:
+  # Enable AI-based cheat detection
+  enabled: false
+  
+  # AI server endpoint
+  endpoint: "https://api.mlsac.wtf"
+  
+  # API key for authentication
+  api-key: "your-api-key"
+  
+  # Number of ticks to collect per sample
+  sample-size: 40
+  
+  # Interval between samples (in ticks)
+  sample-interval: 10
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                              ALERT SETTINGS                                   │
+# └───────────────────────────────────────────────────────────────────────────────┘
+
+alerts:
+  # Probability threshold for sending alerts (0.0 - 1.0) - lowered for early notification
+  threshold: 0.70
+  
+  # Send alerts to console
+  console: true
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                            VIOLATION SETTINGS                                 │
+# └───────────────────────────────────────────────────────────────────────────────┘
+
+violation:
+  # VL threshold for triggering penalties (1 = immediate penalty on first detection)
+  threshold: 20
+  
+  # VL reset value after penalty (0 = full reset)
+  reset-value: 10  
+  # Buffer increase multiplier: (probability - threshold) * multiplier
+  # Example: prob 1.0 with threshold 0.70 = (1.0 - 0.70) * 33.33 = 10 buffer
+  multiplier: 33.33
+  
+  # Buffer decay when probability < 0.1 (low probability threshold)
+  decay: 0.35
+  # VL decay settings (reset VL when player is not in combat)
+  # Protects legitimate players from random false positives
+  vl-decay:
+    # Enable automatic VL decay
+    enabled: true
+    # Check interval in seconds (how often to check and reduce VL)
+    interval: 200
+    # Amount of VL to reduce per interval
+    amount: 1
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                            PENALTY SETTINGS                                   │
+# └───────────────────────────────────────────────────────────────────────────────┘
+# 
+# Available action prefixes:
+#   {BAN}          - Execute ban command
+#   {KICK}         - Execute kick command  
+#   {CUSTOM_ALERT} - Send custom alert to moderators
+#   (no prefix)    - Execute raw command
+#
+# Available placeholders:
+#   {PLAYER}      - Player name
+#   {VL}          - Violation level
+#   {PROBABILITY} - Detection probability
+#   {BUFFER}      - Buffer value
+#
+# Legacy placeholders also supported: <player>, <vl>, <probability>, <buffer>
+#
+
+penalties:
+  # Minimum probability required for penalty execution (lowered for aggressiveness)
+  min-probability: 0.80
+  
+  # Prefix for custom alerts
+  custom-alert-prefix: "&6[MLSAC] &f"
+  
+  # Ban animation settings
+  # Epic animation: levitation + purple/pink particles + lightning strike
+  animation:
+    enabled: true
+    # Duration in ticks (20 ticks = 1 second) - decreased for fast ban
+    duration: 40
+  
+  # Actions by violation level
+  # Aggressive system: alert -> kick -> ban
+  actions:
+    1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
+    2: "{KICK} kick {PLAYER} &cMLSAC Detection &7(VL:{VL})"
+    3: "{BAN} ban {PLAYER} &cCheating &7(MLSAC VL:{VL})"
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                          MESSAGE SETTINGS                                     │
+# └───────────────────────────────────────────────────────────────────────────────┘
+#
+# Color codes:
+#   &0-&f - Standard Minecraft colors
+#   &#RRGGBB - Hex colors (1.16+)
+#
+# Formatting:
+#   &l - Bold, &o - Italic, &n - Underline, &m - Strikethrough, &r - Reset
+#
+
+messages:
+  prefix: "&6[MLSAC] &r"
+  
+  alerts-enabled: "&aAlerts enabled"
+  alerts-disabled: "&eAlerts disabled"
+  alert-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER}"
+  alert-format-vl: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &cVL: {VL}"
+  
+  unknown-command: "&cUnknown command: &f{ARGS}"
+  players-only: "&cThis command is for players only"
+  no-permission: "&cYou don't have permission"
+  player-not-found: "&cPlayer not found: &f{PLAYER}"
+  config-reloaded: "&aConfiguration reloaded!"
+  
+  tracking-stopped: "&eTracking stopped"
+  tracking-started: "&aTracking player &f{PLAYER}&a. Use &f/mlsac prob &aagain to stop"
+  prob-usage: "&eUsage: &f/mlsac prob <player>"
+  player-offline: "&cPlayer is offline"
+  
+  actionbar-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &eBuffer: &f{BUFFER} &7| &2VL: &f{VL}"
+  
+  data-status-header: "&e=== Data Collection Status ==="
+  active-sessions: "&fActive sessions: &e{COUNT}"
+  no-active-sessions: "&7No active data collection sessions"
+  start-hint: "&7Use &e/mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> &7to start"
+  session-started: "&aStarted &f{LABEL} &asession for &f{COUNT} &aplayer(s)"
+  session-stopped: "&eStopped session for &f{PLAYER}"
+  all-sessions-stopped: "&eStopped &f{COUNT} &esessions"
+  no-sessions-to-stop: "&7No active sessions to stop"
+  no-players-online: "&cNo players online"
+  invalid-label: "&cInvalid label: &f{LABEL}"
+  valid-labels: "&7Available labels: &aCHEAT, LEGIT, UNLABELED"
+  
+  usage-header: "&eUsage:"
+  usage-start: "&7  /mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> \"<comment>\""
+  usage-stop: "&7  /mlsac stop <NICK|GLOBAL>"
+  usage-alerts: "&7  /mlsac alerts - Toggle AI alerts"
+  usage-prob: "&7  /mlsac prob <player> - Track probability (actionbar)"
+  usage-datastatus: "&7  /mlsac datastatus - Data collection status"
+  usage-reload: "&7  /mlsac reload - Reload configuration"
