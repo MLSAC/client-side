@@ -28,8 +28,8 @@ import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.commands.CommandHandler;
+import wtf.mlsac.compat.VersionAdapter;
 import wtf.mlsac.config.Config;
-import wtf.mlsac.config.Label;
 import wtf.mlsac.datacollector.DataCollectorFactory;
 import wtf.mlsac.listeners.HitListener;
 import wtf.mlsac.listeners.PlayerListener;
@@ -66,6 +66,8 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onLoad() {
+        VersionAdapter.init(getLogger());
+        
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().getSettings()
             .reEncodeByDefault(false)
@@ -76,6 +78,8 @@ public final class Main extends JavaPlugin {
     @Override
     public void onEnable() {
         PacketEvents.getAPI().init();
+        
+        VersionAdapter.get().logCompatibilityInfo();
         
         saveDefaultConfig();
         this.config = new Config(this, getLogger());
@@ -104,7 +108,7 @@ public final class Main extends JavaPlugin {
             });
         }
         
-        this.tickListener = new TickListener(sessionManager, aiCheck);
+        this.tickListener = new TickListener(this, sessionManager, aiCheck);
         this.hitListener = new HitListener(sessionManager, aiCheck);
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
         this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager, 
@@ -112,8 +116,12 @@ public final class Main extends JavaPlugin {
         this.teleportListener = new TeleportListener(aiCheck);
         
         this.tickListener.setHitListener(hitListener);
+        this.playerListener.setHitListener(hitListener);
         
-        getServer().getPluginManager().registerEvents(tickListener, this);
+        this.hitListener.cacheOnlinePlayers();
+        
+        this.tickListener.start();
+        
         getServer().getPluginManager().registerEvents(playerListener, this);
         getServer().getPluginManager().registerEvents(teleportListener, this);
         
@@ -140,6 +148,10 @@ public final class Main extends JavaPlugin {
     
     @Override
     public void onDisable() {
+        if (tickListener != null) {
+            tickListener.stop();
+        }
+        
         if (sessionManager != null) {
             getLogger().info("Stopping all active sessions...");
             sessionManager.stopAllSessions();

@@ -23,37 +23,42 @@
 
 package wtf.mlsac.listeners;
 
-import com.destroystokyo.paper.event.server.ServerTickEndEvent;
-
 import wtf.mlsac.checks.AICheck;
+import wtf.mlsac.compat.EventCompat;
 import wtf.mlsac.session.ISessionManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
+import org.bukkit.plugin.java.JavaPlugin;
 
-@SuppressWarnings("unused")
-public class TickListener implements Listener {
+public class TickListener {
     
     private final ISessionManager sessionManager;
     private final AICheck aiCheck;
+    private final EventCompat.TickHandler tickHandler;
     private HitListener hitListener;
-    private int currentTick;
     
-    public TickListener(ISessionManager sessionManager, AICheck aiCheck) {
+    public TickListener(JavaPlugin plugin, ISessionManager sessionManager, AICheck aiCheck) {
         this.sessionManager = sessionManager;
         this.aiCheck = aiCheck;
-        this.currentTick = 0;
+        
+        this.tickHandler = EventCompat.createTickHandler(plugin, this::onTick);
+    }
+    
+    public void start() {
+        tickHandler.start();
+    }
+    
+    public void stop() {
+        tickHandler.stop();
     }
     
     public void setHitListener(HitListener hitListener) {
         this.hitListener = hitListener;
     }
     
-    @EventHandler
-    public void onServerTick(ServerTickEndEvent event) {
-        currentTick++;
+    private void onTick() {
+        int currentTick = tickHandler.getCurrentTick();
         
         if (hitListener != null) {
             hitListener.setCurrentTick(currentTick);
@@ -67,6 +72,6 @@ public class TickListener implements Listener {
     }
     
     public int getCurrentTick() {
-        return currentTick;
+        return tickHandler.getCurrentTick();
     }
 }

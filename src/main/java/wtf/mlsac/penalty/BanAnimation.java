@@ -43,10 +43,12 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+
+import wtf.mlsac.compat.EffectCompat;
+import wtf.mlsac.compat.ParticleCompat;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -138,15 +140,19 @@ public class BanAnimation implements Listener {
     }
 
     private void freezePlayer(Player player) {
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, TOTAL_ANIMATION_TICKS + 40, 255, false, false));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP, TOTAL_ANIMATION_TICKS + 40, 128, false, false));
+        PotionEffectType slowness = EffectCompat.getSlowness();
+        PotionEffectType jumpBoost = EffectCompat.getJumpBoost();
+        PotionEffectType levitation = EffectCompat.getLevitation();
         
-        try {
-            PotionEffectType levitation = PotionEffectType.getByName("LEVITATION");
-            if (levitation != null) {
-                player.addPotionEffect(new PotionEffect(levitation, TOTAL_ANIMATION_TICKS, 1, false, false));
-            }
-        } catch (Exception ignored) {}
+        if (slowness != null) {
+            EffectCompat.applyEffect(player, slowness, TOTAL_ANIMATION_TICKS + 40, 255, false, false);
+        }
+        if (jumpBoost != null) {
+            EffectCompat.applyEffect(player, jumpBoost, TOTAL_ANIMATION_TICKS + 40, 128, false, false);
+        }
+        if (levitation != null) {
+            EffectCompat.applyEffect(player, levitation, TOTAL_ANIMATION_TICKS, 1, false, false);
+        }
 
         if (player.getGameMode() != GameMode.CREATIVE && player.getGameMode() != GameMode.SPECTATOR) {
             player.setAllowFlight(false);
@@ -155,11 +161,15 @@ public class BanAnimation implements Listener {
     }
     
     private void unfreezePlayer(Player player) {
-        player.removePotionEffect(PotionEffectType.SLOW);
-        player.removePotionEffect(PotionEffectType.JUMP);
+        EffectCompat.removeEffect(player, EffectCompat.getSlowness());
+        EffectCompat.removeEffect(player, EffectCompat.getJumpBoost());
     }
     
     private void spawnRisingParticles(Location center, int tick) {
+        Particle witchParticle = ParticleCompat.getWitchParticle();
+        Particle heartParticle = ParticleCompat.getHeartParticle();
+        Particle dragonBreathParticle = ParticleCompat.getDragonBreathParticle();
+        
         for (int i = 0; i < 8; i++) {
             double angle = Math.toRadians((tick * 15 + i * 45) % 360);
             double radius = 1.5;
@@ -168,10 +178,10 @@ public class BanAnimation implements Listener {
             
             Location particleLoc = center.clone().add(x, -1 + (tick * 0.05), z);
             
-            center.getWorld().spawnParticle(Particle.SPELL_WITCH, particleLoc, 2, 0.1, 0.1, 0.1, 0);
+            ParticleCompat.spawnParticle(center.getWorld(), witchParticle, particleLoc, 2, 0.1, 0.1, 0.1, 0);
             
             if (tick % 3 == 0) {
-                center.getWorld().spawnParticle(Particle.HEART, particleLoc, 1, 0.2, 0.2, 0.2, 0);
+                ParticleCompat.spawnParticle(center.getWorld(), heartParticle, particleLoc, 1, 0.2, 0.2, 0.2, 0);
             }
         }
         
@@ -182,11 +192,14 @@ public class BanAnimation implements Listener {
             0,
             Math.sin(spiralAngle) * spiralRadius
         );
-        center.getWorld().spawnParticle(Particle.DRAGON_BREATH, spiralLoc, 3, 0.05, 0.05, 0.05, 0);
+        ParticleCompat.spawnParticle(center.getWorld(), dragonBreathParticle, spiralLoc, 3, 0.05, 0.05, 0.05, 0);
     }
 
     private void spawnSphereParticles(Location center, double radius, int tick) {
         int particleCount = 20;
+        Particle witchParticle = ParticleCompat.getWitchParticle();
+        Particle dustParticle = ParticleCompat.getDustParticle();
+        Particle endRodParticle = ParticleCompat.getEndRodParticle();
         
         for (int i = 0; i < particleCount; i++) {
             double phi = Math.acos(1 - 2.0 * i / particleCount);
@@ -198,22 +211,27 @@ public class BanAnimation implements Listener {
             
             Location particleLoc = center.clone().add(x, y, z);
             
-            center.getWorld().spawnParticle(Particle.SPELL_WITCH, particleLoc, 1, 0, 0, 0, 0);
+            ParticleCompat.spawnParticle(center.getWorld(), witchParticle, particleLoc, 1, 0, 0, 0, 0);
             
-            if (i % 3 == 0) {
+            if (i % 3 == 0 && dustParticle != null) {
                 Particle.DustOptions dust = new Particle.DustOptions(
                     org.bukkit.Color.fromRGB(255, 105, 180),
                     1.0f
                 );
-                center.getWorld().spawnParticle(Particle.REDSTONE, particleLoc, 1, 0, 0, 0, 0, dust);
+                ParticleCompat.spawnParticle(center.getWorld(), dustParticle, particleLoc, 1, 0, 0, 0, 0, dust);
             }
         }
         
-        center.getWorld().spawnParticle(Particle.END_ROD, center, 5, 0.3, 0.5, 0.3, 0.02);
+        ParticleCompat.spawnParticle(center.getWorld(), endRodParticle, center, 5, 0.3, 0.5, 0.3, 0.02);
     }
     
     private void spawnExplosionParticles(Location center) {
-        center.getWorld().spawnParticle(Particle.EXPLOSION_HUGE, center, 1, 0, 0, 0, 0);
+        Particle explosionParticle = ParticleCompat.getExplosionParticle();
+        Particle witchParticle = ParticleCompat.getWitchParticle();
+        Particle dustParticle = ParticleCompat.getDustParticle();
+        Particle soulParticle = ParticleCompat.getSoulParticle();
+        
+        ParticleCompat.spawnParticle(center.getWorld(), explosionParticle, center, 1, 0, 0, 0, 0);
         
         for (int i = 0; i < 50; i++) {
             Vector dir = new Vector(
@@ -223,16 +241,18 @@ public class BanAnimation implements Listener {
             ).normalize().multiply(2);
             
             Location particleLoc = center.clone().add(dir);
-            center.getWorld().spawnParticle(Particle.SPELL_WITCH, particleLoc, 3, 0.1, 0.1, 0.1, 0);
+            ParticleCompat.spawnParticle(center.getWorld(), witchParticle, particleLoc, 3, 0.1, 0.1, 0.1, 0);
         }
         
-        Particle.DustOptions pinkDust = new Particle.DustOptions(
-            org.bukkit.Color.fromRGB(255, 20, 147),
-            2.0f
-        );
-        center.getWorld().spawnParticle(Particle.REDSTONE, center, 100, 1.5, 1.5, 1.5, 0, pinkDust);
+        if (dustParticle != null) {
+            Particle.DustOptions pinkDust = new Particle.DustOptions(
+                org.bukkit.Color.fromRGB(255, 20, 147),
+                2.0f
+            );
+            ParticleCompat.spawnParticle(center.getWorld(), dustParticle, center, 100, 1.5, 1.5, 1.5, 0, pinkDust);
+        }
         
-        center.getWorld().spawnParticle(Particle.SOUL, center, 30, 0.5, 0.5, 0.5, 0.1);
+        ParticleCompat.spawnParticle(center.getWorld(), soulParticle, center, 30, 0.5, 0.5, 0.5, 0.1);
     }
     
     private double easeOutQuad(double t) {

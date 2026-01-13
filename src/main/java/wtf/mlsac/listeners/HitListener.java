@@ -32,13 +32,19 @@ import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientIn
 import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.session.ISessionManager;
 
-import org.bukkit.entity.Entity;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class HitListener extends PacketListenerAbstract {
     
     private final ISessionManager sessionManager;
     private final AICheck aiCheck;
+    
+    private final Map<Integer, UUID> playerIdCache = new ConcurrentHashMap<>();
     
     public HitListener(ISessionManager sessionManager, AICheck aiCheck) {
         super(PacketListenerPriority.NORMAL);
@@ -47,6 +53,35 @@ public class HitListener extends PacketListenerAbstract {
     }
     
     public void setCurrentTick(int tick) {
+        if (tick % 200 == 0) {
+            playerIdCache.entrySet().removeIf(entry -> 
+                Bukkit.getPlayer(entry.getValue()) == null);
+        }
+    }
+    
+    public void cachePlayer(Player player) {
+        if (player != null) {
+            playerIdCache.put(player.getEntityId(), player.getUniqueId());
+        }
+    }
+    
+    public void uncachePlayer(Player player) {
+        if (player != null) {
+            playerIdCache.remove(player.getEntityId());
+        }
+    }
+    
+    public void cacheOnlinePlayers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            cachePlayer(player);
+        }
+    }
+    
+    // Keep old method name for compatibility
+    public void cacheEntity(org.bukkit.entity.Entity entity) {
+        if (entity instanceof Player) {
+            cachePlayer((Player) entity);
+        }
     }
     
     @Override
@@ -67,13 +102,10 @@ public class HitListener extends PacketListenerAbstract {
         }
         
         int targetId = packet.getEntityId();
-        Entity target = getEntityById(attacker, targetId);
+        
+        Player target = getPlayerById(targetId);
         
         if (target == null) {
-            return;
-        }
-        
-        if (!(target instanceof Player)) {
             return;
         }
 
@@ -84,12 +116,19 @@ public class HitListener extends PacketListenerAbstract {
         sessionManager.onAttack(attacker);
     }
     
-    private Entity getEntityById(Player attacker, int entityId) {
-        for (Entity entity : attacker.getWorld().getEntities()) {
-            if (entity.getEntityId() == entityId) {
-                return entity;
+    private Player getPlayerById(int entityId) {
+        UUID uuid = playerIdCache.get(entityId);
+        if (uuid != null) {
+            return Bukkit.getPlayer(uuid);
+        }
+        
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getEntityId() == entityId) {
+                playerIdCache.put(entityId, player.getUniqueId());
+                return player;
             }
         }
+        
         return null;
     }
 }

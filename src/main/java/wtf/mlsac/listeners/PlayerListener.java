@@ -46,6 +46,7 @@ public class PlayerListener implements Listener {
     private final AlertManager alertManager;
     private final ViolationManager violationManager;
     private final SessionManager sessionManager;
+    private HitListener hitListener;
     
     public PlayerListener(JavaPlugin plugin, AICheck aiCheck, AlertManager alertManager, 
                           ViolationManager violationManager, SessionManager sessionManager) {
@@ -56,9 +57,17 @@ public class PlayerListener implements Listener {
         this.sessionManager = sessionManager;
     }
     
+    public void setHitListener(HitListener hitListener) {
+        this.hitListener = hitListener;
+    }
+    
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        
+        if (hitListener != null) {
+            hitListener.cacheEntity(player);
+        }
         
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline()) {
@@ -80,6 +89,10 @@ public class PlayerListener implements Listener {
     }
     
     private void handlePlayerLeave(Player player) {
+        if (hitListener != null) {
+            hitListener.uncachePlayer(player);
+        }
+        
         if (aiCheck != null) {
             aiCheck.handlePlayerQuit(player);
         }
