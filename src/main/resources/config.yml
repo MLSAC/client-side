@@ -62,10 +62,10 @@ alerts:
 
 violation:
   # VL threshold for triggering penalties (1 = immediate penalty on first detection)
-  threshold: 50
+  threshold: 40
   
   # VL reset value after penalty (0 = full reset)
-  reset-value: 25  
+  reset-value: 20  
   # Buffer increase multiplier: (probability - threshold) * multiplier
   # Example: prob 1.0 with threshold 0.70 = (1.0 - 0.70) * 33.33 = 10 buffer
   multiplier: 100.0
