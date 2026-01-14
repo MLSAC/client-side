@@ -25,10 +25,15 @@ repositories {
         name = "codemc-snapshots"
         url = "https://repo.codemc.io/repository/maven-snapshots/"
     }
+    maven {
+        name = "enginehub"
+        url = "https://maven.enginehub.org/repo/"
+    }
 }
 
 dependencies {
     compileOnly "com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT"
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.7'
     implementation 'com.github.retrooper:packetevents-spigot:2.7.0'
     implementation 'com.google.flatbuffers:flatbuffers-java:23.5.26'
     implementation 'com.microsoft.signalr:signalr:8.0.0'

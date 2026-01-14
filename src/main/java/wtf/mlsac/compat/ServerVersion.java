@@ -19,6 +19,7 @@ public enum ServerVersion {
     V1_20(20, 0),
     V1_20_5(20, 5),
     V1_21(21, 0),
+    V1_21_1(21, 1),
     V1_21_4(21, 4),
     UNKNOWN(0, 0);
 
@@ -92,26 +93,18 @@ public enum ServerVersion {
         for (ServerVersion v : values()) {
             if (v == UNKNOWN) continue;
 
-            if (v.minor == minor) {
+            if (v.minor == minor && v.patch <= patch) {
+                // Same minor version, patch must be <= target
                 if (v.patch == patch) {
                     return v; // Exact match
                 }
-                if (v.patch <= patch && (bestMatch == UNKNOWN || v.patch > bestMatch.patch)) {
+                if (bestMatch == UNKNOWN || bestMatch.minor < minor || v.patch > bestMatch.patch) {
                     bestMatch = v;
                 }
-            } else if (v.minor < minor && (bestMatch == UNKNOWN || v.minor > bestMatch.minor)) {
-                bestMatch = v;
-            }
-        }
-
-        // If no match found but minor version is in supported range, use closest lower
-        if (bestMatch == UNKNOWN && minor >= 16 && minor <= 21) {
-            for (ServerVersion v : values()) {
-                if (v != UNKNOWN && v.minor <= minor) {
-                    if (bestMatch == UNKNOWN || v.minor > bestMatch.minor ||
-                        (v.minor == bestMatch.minor && v.patch > bestMatch.patch)) {
-                        bestMatch = v;
-                    }
+            } else if (v.minor < minor) {
+                // Lower minor version - only use if we haven't found same minor match
+                if (bestMatch == UNKNOWN || (bestMatch.minor < minor && v.minor > bestMatch.minor)) {
+                    bestMatch = v;
                 }
             }
         }

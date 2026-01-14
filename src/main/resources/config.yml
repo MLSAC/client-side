@@ -32,7 +32,19 @@ detection:
   
   # Interval between samples (in ticks)
   sample-interval: 10
-
+  
+  # WorldGuard integration for region-based AI check bypass.
+  # Priority system: If player is in multiple regions, the highest priority region
+  # determines if AI check is disabled.
+  # Example: Player in "spawn" (priority 0) and "pvp" (priority 10)
+  # If "spawn" is disabled but "pvp" is not - AI check WILL run (pvp has higher priority)
+  worldguard:
+    # Enable WorldGuard region checking?
+    enabled: true
+    # List of regions where AI check is disabled.
+    # Format: "world:region" or just "region" (applies to all worlds)
+    disabled-regions:
+      - "spawn:spawn"
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                              ALERT SETTINGS                                   │
 # └───────────────────────────────────────────────────────────────────────────────┘
@@ -42,7 +54,7 @@ alerts:
   threshold: 0.75
   
   # Send alerts to console
-  console: true
+  console: false
 
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            VIOLATION SETTINGS                                 │
@@ -50,13 +62,13 @@ alerts:
 
 violation:
   # VL threshold for triggering penalties (1 = immediate penalty on first detection)
-  threshold: 20
+  threshold: 50
   
   # VL reset value after penalty (0 = full reset)
-  reset-value: 10  
+  reset-value: 25  
   # Buffer increase multiplier: (probability - threshold) * multiplier
   # Example: prob 1.0 with threshold 0.70 = (1.0 - 0.70) * 33.33 = 10 buffer
-  multiplier: 50
+  multiplier: 100.0
   
   # Buffer decay when probability < 0.1 (low probability threshold)
   decay: 0.35
@@ -90,7 +102,7 @@ violation:
 
 penalties:
   # Minimum probability required for penalty execution (lowered for aggressiveness)
-  min-probability: 0.80
+  min-probability: 0.50
   
   # Prefix for custom alerts
   custom-alert-prefix: "&6[MLSAC] &f"
@@ -100,7 +112,7 @@ penalties:
   animation:
     enabled: true
     # Duration in ticks (20 ticks = 1 second) - decreased for fast ban
-    duration: 40
+    duration: 80
   
   # Actions by violation level
   # Aggressive system: alert -> kick -> ban

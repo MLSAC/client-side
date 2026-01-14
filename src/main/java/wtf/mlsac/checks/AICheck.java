@@ -29,6 +29,7 @@ import org.bukkit.entity.Player;
 
 import wtf.mlsac.Main;
 import wtf.mlsac.alert.AlertManager;
+import wtf.mlsac.compat.WorldGuardCompat;
 import wtf.mlsac.config.Config;
 import wtf.mlsac.data.AIPlayerData;
 import wtf.mlsac.data.TickData;
@@ -55,6 +56,7 @@ public class AICheck {
     private final Map<UUID, AIPlayerData> playerData;
     
     private Config config;
+    private WorldGuardCompat worldGuardCompat;
     
     private int sequence;
     private int step;
@@ -72,12 +74,24 @@ public class AICheck {
         
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
+        
+        this.worldGuardCompat = new WorldGuardCompat(
+            plugin.getLogger(),
+            config.isWorldGuardEnabled(),
+            config.getWorldGuardDisabledRegions()
+        );
     }
     
     public void setConfig(Config config) {
         this.config = config;
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
+        
+        this.worldGuardCompat = new WorldGuardCompat(
+            plugin.getLogger(),
+            config.isWorldGuardEnabled(),
+            config.getWorldGuardDisabledRegions()
+        );
     }
     
     public void onAttack(Player player, Entity target) {
@@ -86,6 +100,12 @@ public class AICheck {
         }
         
         if (!(target instanceof Player)) {
+            return;
+        }
+        
+        // Check WorldGuard region bypass
+        if (worldGuardCompat.shouldBypassAICheck(player)) {
+            plugin.debug("[AI] Skipping attack for " + player.getName() + " - in disabled WorldGuard region");
             return;
         }
         
@@ -160,6 +180,12 @@ public class AICheck {
         }
         
         if (!data.isInCombat()) {
+            return;
+        }
+        
+        // Check WorldGuard region bypass during combat
+        if (worldGuardCompat.shouldBypassAICheck(player)) {
+            plugin.debug("[AI] Skipping rotation for " + player.getName() + " - in disabled WorldGuard region");
             return;
         }
         
@@ -313,5 +339,9 @@ public class AICheck {
     
     public int getStep() {
         return step;
+    }
+    
+    public WorldGuardCompat getWorldGuardCompat() {
+        return worldGuardCompat;
     }
 }

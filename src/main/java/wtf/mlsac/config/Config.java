@@ -83,6 +83,9 @@ public class Config {
     private final int vlDecayIntervalSeconds;
     private final int vlDecayAmount;
     
+    private final boolean worldGuardEnabled;
+    private final List<String> worldGuardDisabledRegions;
+    
     public static final boolean DEFAULT_DEBUG = false;
     public static final String DEFAULT_OUTPUT_DIRECTORY = "plugins/MLSAC/data";
     
@@ -131,6 +134,9 @@ public class Config {
     public static final boolean DEFAULT_VL_DECAY_ENABLED = true;
     public static final int DEFAULT_VL_DECAY_INTERVAL_SECONDS = 60;
     public static final int DEFAULT_VL_DECAY_AMOUNT = 1;
+    
+    public static final boolean DEFAULT_WORLDGUARD_ENABLED = true;
+    public static final List<String> DEFAULT_WORLDGUARD_DISABLED_REGIONS = new ArrayList<>();
 
     public Config() {
         this.debug = DEFAULT_DEBUG;
@@ -176,6 +182,9 @@ public class Config {
         this.vlDecayEnabled = DEFAULT_VL_DECAY_ENABLED;
         this.vlDecayIntervalSeconds = DEFAULT_VL_DECAY_INTERVAL_SECONDS;
         this.vlDecayAmount = DEFAULT_VL_DECAY_AMOUNT;
+        
+        this.worldGuardEnabled = DEFAULT_WORLDGUARD_ENABLED;
+        this.worldGuardDisabledRegions = new ArrayList<>(DEFAULT_WORLDGUARD_DISABLED_REGIONS);
     }
     
     private static Set<String> createDefaultCheatReasons() {
@@ -300,6 +309,9 @@ public class Config {
         this.vlDecayEnabled = config.getBoolean("violation.vl-decay.enabled", DEFAULT_VL_DECAY_ENABLED);
         this.vlDecayIntervalSeconds = config.getInt("violation.vl-decay.interval", DEFAULT_VL_DECAY_INTERVAL_SECONDS);
         this.vlDecayAmount = config.getInt("violation.vl-decay.amount", DEFAULT_VL_DECAY_AMOUNT);
+        
+        this.worldGuardEnabled = config.getBoolean("detection.worldguard.enabled", DEFAULT_WORLDGUARD_ENABLED);
+        this.worldGuardDisabledRegions = config.getStringList("detection.worldguard.disabled-regions");
     }
 
     private double clampThreshold(double value, String configPath, Logger logger) {
@@ -417,4 +429,7 @@ public class Config {
     public boolean isVlDecayEnabled() { return vlDecayEnabled; }
     public int getVlDecayIntervalSeconds() { return vlDecayIntervalSeconds; }
     public int getVlDecayAmount() { return vlDecayAmount; }
+    
+    public boolean isWorldGuardEnabled() { return worldGuardEnabled; }
+    public List<String> getWorldGuardDisabledRegions() { return worldGuardDisabledRegions; }
 }
