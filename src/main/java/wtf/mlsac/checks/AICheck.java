@@ -96,6 +96,9 @@ public class AICheck {
             plugin.debug("[AI] Skipping attack for " + player.getName() + " - in disabled WorldGuard region");
             return;
         }
+        if (!player.isValid()) {
+            return;
+        }
         schedulerAdapter.runEntitySync(player, () -> {
             AIPlayerData data = getOrCreatePlayerData(player);
             if (!data.isInCombat()) {
@@ -112,6 +115,9 @@ public class AICheck {
         if (!config.isAiEnabled()) {
             return;
         }
+        if (!player.isValid()) {
+            return;
+        }
         schedulerAdapter.runEntitySync(player, () -> {
             AIPlayerData data = playerData.get(player.getUniqueId());
             if (data != null) {
@@ -125,6 +131,9 @@ public class AICheck {
             return;
         }
         if (!isClientAvailable()) {
+            return;
+        }
+        if (!player.isValid()) {
             return;
         }
         schedulerAdapter.runEntitySync(player, () -> {
@@ -150,6 +159,9 @@ public class AICheck {
             return;
         }
         if (!isClientAvailable()) {
+            return;
+        }
+        if (!player.isValid()) {
             return;
         }
         schedulerAdapter.runEntitySync(player, () -> {
