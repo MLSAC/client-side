@@ -6,20 +6,31 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * This file contains code derived from:
+ *   - SlothAC (© 2025 KaelusMC, https://github.com/KaelusMC/SlothAC)
+ *   - Grim (© 2025 GrimAnticheat, https://github.com/GrimAnticheat/Grim)
+ * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.compat;
 
+package wtf.mlsac.compat;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
-
+import wtf.mlsac.scheduler.ScheduledTask;
+import wtf.mlsac.scheduler.SchedulerManager;
 public final class EventCompat {
-
     private static boolean hasServerTickEndEvent = false;
-
     static {
         try {
             Class.forName("com.destroystokyo.paper.event.server.ServerTickEndEvent");
@@ -28,14 +39,11 @@ public final class EventCompat {
             hasServerTickEndEvent = false;
         }
     }
-
     private EventCompat() {
     }
-
     public static boolean hasServerTickEndEvent() {
         return hasServerTickEndEvent;
     }
-
     public static TickHandler createTickHandler(JavaPlugin plugin, Runnable onTick) {
         if (hasServerTickEndEvent) {
             return new PaperTickHandler(plugin, onTick);
@@ -43,26 +51,20 @@ public final class EventCompat {
             return new SpigotTickHandler(plugin, onTick);
         }
     }
-
     public interface TickHandler {
         void start();
-
         void stop();
-
         int getCurrentTick();
     }
-
     private static class PaperTickHandler implements TickHandler, Listener {
         private final JavaPlugin plugin;
         private final Runnable onTick;
         private int currentTick = 0;
         private boolean running = false;
-
         PaperTickHandler(JavaPlugin plugin, Runnable onTick) {
             this.plugin = plugin;
             this.onTick = onTick;
         }
-
         @Override
         public void start() {
             if (!running) {
@@ -70,7 +72,6 @@ public final class EventCompat {
                 running = true;
             }
         }
-
         @Override
         public void stop() {
             if (running) {
@@ -78,12 +79,10 @@ public final class EventCompat {
                 running = false;
             }
         }
-
         @Override
         public int getCurrentTick() {
             return currentTick;
         }
-
         @org.bukkit.event.EventHandler
         public void onServerTick(com.destroystokyo.paper.event.server.ServerTickEndEvent event) {
             currentTick++;
@@ -92,22 +91,19 @@ public final class EventCompat {
             }
         }
     }
-
     private static class SpigotTickHandler implements TickHandler {
         private final JavaPlugin plugin;
         private final Runnable onTick;
-        private BukkitTask task;
+        private ScheduledTask task;
         private int currentTick = 0;
-
         SpigotTickHandler(JavaPlugin plugin, Runnable onTick) {
             this.plugin = plugin;
             this.onTick = onTick;
         }
-
         @Override
         public void start() {
             if (task == null) {
-                task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                task = SchedulerManager.getAdapter().runSyncRepeating(() -> {
                     currentTick++;
                     if (onTick != null) {
                         onTick.run();
@@ -115,7 +111,6 @@ public final class EventCompat {
                 }, 0L, 1L);
             }
         }
-
         @Override
         public void stop() {
             if (task != null) {
@@ -123,7 +118,6 @@ public final class EventCompat {
                 task = null;
             }
         }
-
         @Override
         public int getCurrentTick() {
             return currentTick;

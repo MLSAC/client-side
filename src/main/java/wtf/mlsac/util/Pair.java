@@ -21,6 +21,6 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.util;
 
+package wtf.mlsac.util;
 public record Pair<A, B>(A first, B second) {}

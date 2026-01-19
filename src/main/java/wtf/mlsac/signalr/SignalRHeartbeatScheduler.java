@@ -14,49 +14,42 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * This file contains code derived from:
+ *   - SlothAC (© 2025 KaelusMC, https://github.com/KaelusMC/SlothAC)
+ *   - Grim (© 2025 GrimAnticheat, https://github.com/GrimAnticheat/Grim)
+ * All derived code is licensed under GPL-3.0.
  */
 
+
 package wtf.mlsac.signalr;
-
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
-
+import wtf.mlsac.scheduler.ScheduledTask;
+import wtf.mlsac.scheduler.SchedulerManager;
 import java.util.logging.Logger;
-
 public class SignalRHeartbeatScheduler {
-    
     private static final int DEFAULT_INTERVAL_SECONDS = 30;
-    
     private final JavaPlugin plugin;
     private final SignalRSessionManager sessionManager;
     private final Logger logger;
-    
-    private BukkitTask scheduledTask;
+    private ScheduledTask scheduledTask;
     private Runnable onSessionExpiredCallback;
-    
     public SignalRHeartbeatScheduler(JavaPlugin plugin, SignalRSessionManager sessionManager) {
         this.plugin = plugin;
         this.sessionManager = sessionManager;
         this.logger = plugin.getLogger();
     }
-    
     public void start() {
         start(DEFAULT_INTERVAL_SECONDS);
     }
-    
     public void start(int intervalSeconds) {
         if (scheduledTask != null) {
             stop();
         }
-        
         long intervalTicks = intervalSeconds * 20L;
-        
-        scheduledTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::sendHeartbeat, intervalTicks, intervalTicks);
-        
+        scheduledTask = SchedulerManager.getAdapter().runAsyncRepeating(this::sendHeartbeat, intervalTicks, intervalTicks);
         logger.info("[SignalR] Heartbeat scheduler started (interval: " + intervalSeconds + "s)");
     }
-    
     public void stop() {
         if (scheduledTask != null) {
             scheduledTask.cancel();
@@ -64,17 +57,14 @@ public class SignalRHeartbeatScheduler {
             logger.info("[SignalR] Heartbeat scheduler stopped");
         }
     }
-    
     private void sendHeartbeat() {
         if (!sessionManager.isSessionValid()) {
             return;
         }
-        
         sessionManager.sendHeartbeat()
             .thenAccept(result -> {
                 if (!result.isSuccess()) {
                     String error = result.getError();
-                    
                     if (error != null && (error.contains("expired") || error.contains("invalid"))) {
                         logger.warning("[SignalR] Heartbeat failed: " + error);
                         if (onSessionExpiredCallback != null) {
@@ -84,11 +74,9 @@ public class SignalRHeartbeatScheduler {
                 }
             });
     }
-    
     public void setOnSessionExpiredCallback(Runnable callback) {
         this.onSessionExpiredCallback = callback;
     }
-    
     public boolean isRunning() {
         return scheduledTask != null && !scheduledTask.isCancelled();
     }

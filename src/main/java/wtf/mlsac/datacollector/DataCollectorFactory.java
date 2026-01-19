@@ -21,13 +21,11 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.datacollector;
 
+package wtf.mlsac.datacollector;
 import wtf.mlsac.Main;
 import wtf.mlsac.session.ISessionManager;
-
 public class DataCollectorFactory {
-    
     public static ISessionManager createSessionManager(Main plugin) {
         return new wtf.mlsac.session.SessionManager(plugin);
     }

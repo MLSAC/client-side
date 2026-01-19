@@ -21,10 +21,9 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.signalr.dto;
 
+package wtf.mlsac.signalr.dto;
 public class HeartbeatResponse {
     public long serverTime;
-    
     public HeartbeatResponse() {}
 }

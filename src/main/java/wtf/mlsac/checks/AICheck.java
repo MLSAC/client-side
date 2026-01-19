@@ -21,46 +21,41 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.checks;
 
+package wtf.mlsac.checks;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-
 import wtf.mlsac.Main;
 import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.compat.WorldGuardCompat;
 import wtf.mlsac.config.Config;
 import wtf.mlsac.data.AIPlayerData;
 import wtf.mlsac.data.TickData;
+import wtf.mlsac.scheduler.SchedulerAdapter;
+import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIClientProvider;
 import wtf.mlsac.server.AIResponse;
 import wtf.mlsac.server.FlatBufferSerializer;
 import wtf.mlsac.server.IAIClient;
 import wtf.mlsac.violation.ViolationManager;
-
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
-
 public class AICheck {
-    
     private final Main plugin;
     private final AIClientProvider clientProvider;
     private final AlertManager alertManager;
     private final ViolationManager violationManager;
     private final Logger logger;
-    
+    private final SchedulerAdapter schedulerAdapter;
     private final Map<UUID, AIPlayerData> playerData;
-    
     private Config config;
     private WorldGuardCompat worldGuardCompat;
-    
     private int sequence;
     private int step;
-
     public AICheck(Main plugin, Config config,
                    AIClientProvider clientProvider,
                    AlertManager alertManager, ViolationManager violationManager) {
@@ -70,154 +65,127 @@ public class AICheck {
         this.alertManager = alertManager;
         this.violationManager = violationManager;
         this.logger = plugin.getLogger();
+        this.schedulerAdapter = SchedulerManager.getAdapter();
         this.playerData = new ConcurrentHashMap<>();
-        
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
-        
         this.worldGuardCompat = new WorldGuardCompat(
             plugin.getLogger(),
             config.isWorldGuardEnabled(),
             config.getWorldGuardDisabledRegions()
         );
     }
-    
     public void setConfig(Config config) {
         this.config = config;
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
-        
         this.worldGuardCompat = new WorldGuardCompat(
             plugin.getLogger(),
             config.isWorldGuardEnabled(),
             config.getWorldGuardDisabledRegions()
         );
     }
-    
     public void onAttack(Player player, Entity target) {
         if (!config.isAiEnabled()) {
             return;
         }
-        
         if (!(target instanceof Player)) {
             return;
         }
-        
-        // Check WorldGuard region bypass
         if (worldGuardCompat.shouldBypassAICheck(player)) {
             plugin.debug("[AI] Skipping attack for " + player.getName() + " - in disabled WorldGuard region");
             return;
         }
-        
-        AIPlayerData data = getOrCreatePlayerData(player);
-        
-        if (!data.isInCombat()) {
-            data.clearBuffer();
-            data.getAimProcessor().reset();
-            plugin.debug("[AI] New combat started for " + player.getName() + ", cleared old data");
-        }
-        
-        data.onAttack();
-        
-        plugin.debug("[AI] Attack registered for " + player.getName() + 
-            ", buffer=" + data.getBufferSize() + "/" + sequence);
+        schedulerAdapter.runEntitySync(player, () -> {
+            AIPlayerData data = getOrCreatePlayerData(player);
+            if (!data.isInCombat()) {
+                data.clearBuffer();
+                data.getAimProcessor().reset();
+                plugin.debug("[AI] New combat started for " + player.getName() + ", cleared old data");
+            }
+            data.onAttack();
+            plugin.debug("[AI] Attack registered for " + player.getName() + 
+                ", buffer=" + data.getBufferSize() + "/" + sequence);
+        });
     }
-    
     public void onTeleport(Player player) {
         if (!config.isAiEnabled()) {
             return;
         }
-        
-        AIPlayerData data = playerData.get(player.getUniqueId());
-        if (data != null) {
-            data.onTeleport();
-            plugin.debug("[AI] Teleport registered for " + player.getName() + ", resetting data");
-        }
+        schedulerAdapter.runEntitySync(player, () -> {
+            AIPlayerData data = playerData.get(player.getUniqueId());
+            if (data != null) {
+                data.onTeleport();
+                plugin.debug("[AI] Teleport registered for " + player.getName() + ", resetting data");
+            }
+        });
     }
-    
     public void onTick(Player player) {
         if (!config.isAiEnabled()) {
             return;
         }
-        
         if (!isClientAvailable()) {
             return;
         }
-        
-        AIPlayerData data = getOrCreatePlayerData(player);
-        
-        data.incrementTicksSinceAttack();
-        
-        if (data.getTicksSinceAttack() > sequence) {
-            // Don't send if there's already a pending request
-            if (!data.isPendingRequest() && data.getBufferSize() >= sequence) {
-                plugin.debug("[AI] Combat ended for " + player.getName() + 
-                    ", sending final buffer (" + data.getBufferSize() + " ticks)");
-                data.setPendingRequest(true);
-                sendDataToAI(player, data);
+        schedulerAdapter.runEntitySync(player, () -> {
+            AIPlayerData data = getOrCreatePlayerData(player);
+            data.incrementTicksSinceAttack();
+            if (data.getTicksSinceAttack() > sequence) {
+                if (!data.isPendingRequest() && data.getBufferSize() >= sequence) {
+                    plugin.debug("[AI] Combat ended for " + player.getName() + 
+                        ", sending final buffer (" + data.getBufferSize() + " ticks)");
+                    data.setPendingRequest(true);
+                    sendDataToAI(player, data);
+                }
+                if (!data.isPendingRequest() && data.getTicksSinceAttack() > sequence * 2 && data.getBufferSize() > 0) {
+                    data.clearBuffer();
+                }
+                data.resetStepCounter();
+                return;
             }
-            // Only clear buffer if combat truly ended and no pending request
-            if (!data.isPendingRequest() && data.getTicksSinceAttack() > sequence * 2 && data.getBufferSize() > 0) {
-                data.clearBuffer();
-            }
-            data.resetStepCounter();
-            return;
-        }
+        });
     }
-    
     public void onRotationPacket(Player player, float yaw, float pitch) {
         if (!config.isAiEnabled()) {
             return;
         }
-        
         if (!isClientAvailable()) {
             return;
         }
-        
-        AIPlayerData data = playerData.get(player.getUniqueId());
-        if (data == null) {
-            return;
-        }
-        
-        if (!data.isInCombat()) {
-            return;
-        }
-        
-        // Check WorldGuard region bypass during combat
-        if (worldGuardCompat.shouldBypassAICheck(player)) {
-            plugin.debug("[AI] Skipping rotation for " + player.getName() + " - in disabled WorldGuard region");
-            return;
-        }
-        
-        data.processTick(yaw, pitch);
-        
-        data.incrementStepCounter();
-        
-        if (data.shouldSendData(step, sequence)) {
-            data.setPendingRequest(true);
-            sendDataToAI(player, data);
-            data.resetStepCounter();
-            // Don't clear buffer here - will be cleared after response is processed
-        }
+        schedulerAdapter.runEntitySync(player, () -> {
+            AIPlayerData data = playerData.get(player.getUniqueId());
+            if (data == null) {
+                return;
+            }
+            if (!data.isInCombat()) {
+                return;
+            }
+            if (worldGuardCompat.shouldBypassAICheck(player)) {
+                plugin.debug("[AI] Skipping rotation for " + player.getName() + " - in disabled WorldGuard region");
+                return;
+            }
+            data.processTick(yaw, pitch);
+            data.incrementStepCounter();
+            if (data.shouldSendData(step, sequence)) {
+                data.setPendingRequest(true);
+                sendDataToAI(player, data);
+                data.resetStepCounter();
+            }
+        });
     }
-
     private void sendDataToAI(Player player, AIPlayerData data) {
         List<TickData> ticks = data.getTickBuffer();
-        
         if (ticks.size() < sequence) {
             plugin.debug("[AI] Not enough ticks for " + player.getName() + 
                 ": " + ticks.size() + "/" + sequence);
             return;
         }
-        
         IAIClient client = clientProvider.get();
         if (client == null) {
             return;
         }
-        
         plugin.debug("[AI] Sending " + ticks.size() + " ticks for " + player.getName() + 
             " (ticksSinceAttack=" + data.getTicksSinceAttack() + ")");
-        
         if (config.isDebug()) {
             plugin.debug("[AI] === TICK BUFFER START ===");
             int i = 0;
@@ -234,12 +202,9 @@ public class AICheck {
             }
             plugin.debug("[AI] === TICK BUFFER END ===");
         }
-        
         byte[] serialized = FlatBufferSerializer.serialize(ticks);
-        
         final UUID playerUuid = player.getUniqueId();
         final String playerName = player.getName();
-        
         client.predict(serialized, playerUuid.toString())
             .thenAccept(response -> processResponse(playerUuid, playerName, data, response))
             .exceptionally(error -> {
@@ -247,44 +212,36 @@ public class AICheck {
                 return null;
             });
     }
-    
     private boolean isClientAvailable() {
         return clientProvider != null && clientProvider.isAvailable();
     }
-    
     private void processResponse(UUID playerUuid, String playerName, AIPlayerData data, AIResponse response) {
-        // Clear pending flag and buffer after receiving response
-        data.setPendingRequest(false);
-        data.clearBuffer();
-        
-        if (response.getError() != null && response.getError().contains("INVALID_SEQUENCE")) {
-            handleInvalidSequence(response.getError());
-            return;
-        }
-        
-        double probability = response.getProbability();
-        
-        plugin.debug("[AI] Response for " + playerName + ": probability=" + 
-            String.format("%.3f", probability));
-        
-        data.updateBuffer(probability, config.getAiBufferMultiplier(), 
-            config.getAiBufferDecrease(), config.getAiAlertThreshold());
-        
-        if (alertManager.shouldAlert(probability)) {
-            alertManager.sendAlert(playerName, probability, data.getBuffer());
-        }
-        
-        if (data.shouldFlag(config.getAiBufferFlag())) {
-            Player player = Bukkit.getPlayer(playerUuid);
-            if (player != null && player.isOnline()) {
-                violationManager.handleFlag(player, probability, data.getBuffer());
-            } else {
-                logger.warning("[AI] Player " + playerName + " went offline before punishment");
+        schedulerAdapter.runSync(() -> {
+            data.setPendingRequest(false);
+            data.clearBuffer();
+            if (response.getError() != null && response.getError().contains("INVALID_SEQUENCE")) {
+                handleInvalidSequence(response.getError());
+                return;
             }
-            data.resetBuffer(config.getAiBufferResetOnFlag());
-        }
+            double probability = response.getProbability();
+            plugin.debug("[AI] Response for " + playerName + ": probability=" + 
+                String.format("%.3f", probability));
+            data.updateBuffer(probability, config.getAiBufferMultiplier(), 
+                config.getAiBufferDecrease(), config.getAiAlertThreshold());
+            if (alertManager.shouldAlert(probability)) {
+                alertManager.sendAlert(playerName, probability, data.getBuffer());
+            }
+            if (data.shouldFlag(config.getAiBufferFlag())) {
+                Player player = Bukkit.getPlayer(playerUuid);
+                if (player != null && player.isOnline()) {
+                    violationManager.handleFlag(player, probability, data.getBuffer());
+                } else {
+                    logger.warning("[AI] Player " + playerName + " went offline before punishment");
+                }
+                data.resetBuffer(config.getAiBufferResetOnFlag());
+            }
+        });
     }
-    
     private void handleInvalidSequence(String error) {
         try {
             String[] parts = error.split(":");
@@ -293,7 +250,6 @@ public class AICheck {
                 if (newSequence > 0 && newSequence != this.sequence) {
                     logger.info("[AI] Updating sequence from " + this.sequence + " to " + newSequence);
                     this.sequence = newSequence;
-                    
                     for (AIPlayerData data : playerData.values()) {
                         data.clearBuffer();
                     }
@@ -303,44 +259,35 @@ public class AICheck {
             logger.warning("[AI] Failed to parse new sequence from error: " + error);
         }
     }
-    
     private void handleError(String playerName, AIPlayerData data, Throwable error) {
-        // Clear pending flag on error so player can be checked again
         if (data != null) {
             data.setPendingRequest(false);
         }
         Throwable cause = error.getCause() != null ? error.getCause() : error;
         logger.warning("[AI] Error for " + playerName + ": " + cause.getMessage());
     }
-    
     private AIPlayerData getOrCreatePlayerData(Player player) {
         return playerData.computeIfAbsent(player.getUniqueId(), 
             uuid -> new AIPlayerData(uuid, sequence));
     }
-    
     public AIPlayerData getPlayerData(UUID playerId) {
         return playerData.get(playerId);
     }
-    
     public void handlePlayerQuit(Player player) {
         AIPlayerData data = playerData.remove(player.getUniqueId());
         if (data != null) {
             data.fullReset();
         }
     }
-    
     public void clearAll() {
         playerData.clear();
     }
-    
     public int getSequence() {
         return sequence;
     }
-    
     public int getStep() {
         return step;
     }
-    
     public WorldGuardCompat getWorldGuardCompat() {
         return worldGuardCompat;
     }

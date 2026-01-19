@@ -21,56 +21,44 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.listeners;
 
+package wtf.mlsac.listeners;
 import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.compat.EventCompat;
 import wtf.mlsac.session.ISessionManager;
-
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-
 public class TickListener {
-    
     private final ISessionManager sessionManager;
     private final AICheck aiCheck;
     private final EventCompat.TickHandler tickHandler;
     private HitListener hitListener;
-    
     public TickListener(JavaPlugin plugin, ISessionManager sessionManager, AICheck aiCheck) {
         this.sessionManager = sessionManager;
         this.aiCheck = aiCheck;
-        
         this.tickHandler = EventCompat.createTickHandler(plugin, this::onTick);
     }
-    
     public void start() {
         tickHandler.start();
     }
-    
     public void stop() {
         tickHandler.stop();
     }
-    
     public void setHitListener(HitListener hitListener) {
         this.hitListener = hitListener;
     }
-    
     private void onTick() {
         int currentTick = tickHandler.getCurrentTick();
-        
         if (hitListener != null) {
             hitListener.setCurrentTick(currentTick);
         }
-        
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (aiCheck != null) {
                 aiCheck.onTick(player);
             }
         }
     }
-    
     public int getCurrentTick() {
         return tickHandler.getCurrentTick();
     }

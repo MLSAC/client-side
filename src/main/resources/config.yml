@@ -173,3 +173,30 @@ messages:
   usage-prob: "&7  /mlsac prob <player> - Track probability (actionbar)"
   usage-datastatus: "&7  /mlsac datastatus - Data collection status"
   usage-reload: "&7  /mlsac reload - Reload configuration"
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                            FOLIA SETTINGS                                     │
+# └───────────────────────────────────────────────────────────────────────────────┘
+#
+# These settings are only used when running on a Folia server.
+# On Bukkit/Paper/Spigot servers, these settings are ignored.
+#
+
+folia:
+  # Enable Folia-specific optimizations
+  # When disabled, the plugin will use standard Bukkit scheduler even on Folia
+  enabled: true
+  
+  # Thread pool size for async tasks (0 = use Folia default)
+  thread-pool-size: 0
+  
+  # Entity scheduler settings
+  # Use entity-specific schedulers for entity-related tasks
+  entity-scheduler:
+    enabled: true
+  
+  # Region scheduler settings
+  # Use region-specific schedulers for location-based tasks
+  region-scheduler:
+    enabled: true
+

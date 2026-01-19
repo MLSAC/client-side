@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac;
 
+package wtf.mlsac;
 import com.github.retrooper.packetevents.PacketEvents;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import wtf.mlsac.alert.AlertManager;
@@ -36,19 +36,16 @@ import wtf.mlsac.listeners.PlayerListener;
 import wtf.mlsac.listeners.RotationListener;
 import wtf.mlsac.listeners.TeleportListener;
 import wtf.mlsac.listeners.TickListener;
+import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIClientProvider;
 import wtf.mlsac.session.ISessionManager;
 import wtf.mlsac.session.SessionManager;
 import wtf.mlsac.util.FeatureCalculator;
 import wtf.mlsac.violation.ViolationManager;
-
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
-
 import java.io.File;
-
 public final class Main extends JavaPlugin {
-
     private Config config;
     private ISessionManager sessionManager;
     private FeatureCalculator featureCalculator;
@@ -58,46 +55,44 @@ public final class Main extends JavaPlugin {
     private PlayerListener playerListener;
     private TeleportListener teleportListener;
     private CommandHandler commandHandler;
-    
     private AIClientProvider aiClientProvider;
     private AlertManager alertManager;
     private ViolationManager violationManager;
     private AICheck aiCheck;
-
     @Override
     public void onLoad() {
         VersionAdapter.init(getLogger());
-        
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().getSettings()
             .reEncodeByDefault(false)
             .checkForUpdates(false);
         PacketEvents.getAPI().load();
     }
-
     @Override
     public void onEnable() {
+        try {
+            SchedulerManager.initialize(this);
+            getLogger().info("SchedulerManager initialized for " + SchedulerManager.getServerType());
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize SchedulerManager: " + e.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         PacketEvents.getAPI().init();
-        
         VersionAdapter.get().logCompatibilityInfo();
-        
         saveDefaultConfig();
         this.config = new Config(this, getLogger());
-        
         File outputDir = new File(config.getOutputDirectory());
         if (!outputDir.exists()) {
             outputDir.mkdirs();
         }
-        
         this.featureCalculator = new FeatureCalculator();
         this.sessionManager = DataCollectorFactory.createSessionManager(this);
-        
         this.aiClientProvider = new AIClientProvider(this, config);
         this.alertManager = new AlertManager(this, config);
         this.violationManager = new ViolationManager(this, config, alertManager);
         this.aiCheck = new AICheck(this, config, aiClientProvider, alertManager, violationManager);
         this.violationManager.setAICheck(aiCheck);
-        
         if (config.isAiEnabled()) {
             aiClientProvider.initialize().thenAccept(success -> {
                 if (success) {
@@ -107,56 +102,43 @@ public final class Main extends JavaPlugin {
                 }
             });
         }
-        
         this.tickListener = new TickListener(this, sessionManager, aiCheck);
         this.hitListener = new HitListener(sessionManager, aiCheck);
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
         this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager, 
             sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null);
         this.teleportListener = new TeleportListener(aiCheck);
-        
         this.tickListener.setHitListener(hitListener);
         this.playerListener.setHitListener(hitListener);
-        
         this.hitListener.cacheOnlinePlayers();
-        
         this.tickListener.start();
-        
         getServer().getPluginManager().registerEvents(playerListener, this);
         getServer().getPluginManager().registerEvents(teleportListener, this);
-        
         PacketEvents.getAPI().getEventManager().registerListener(hitListener);
         PacketEvents.getAPI().getEventManager().registerListener(rotationListener);
-        
         this.commandHandler = new CommandHandler(sessionManager, alertManager, aiCheck, this);
         PluginCommand command = getCommand("mlsac");
         if (command != null) {
             command.setExecutor(commandHandler);
             command.setTabCompleter(commandHandler);
         }
-        
         getLogger().info("MLSAC enabled successfully!");
         getLogger().info("Data collector: ENABLED (output: " + config.getOutputDirectory() + ")");
-        
         if (config.isAiEnabled()) {
             getLogger().info("AI detection: ENABLED (threshold: " + config.getAiAlertThreshold() + ")");
         } else {
             getLogger().info("AI detection: DISABLED");
         }
-        
     }
-    
     @Override
     public void onDisable() {
         if (tickListener != null) {
             tickListener.stop();
         }
-        
         if (sessionManager != null) {
             getLogger().info("Stopping all active sessions...");
             sessionManager.stopAllSessions();
         }
-        
         if (aiCheck != null) {
             aiCheck.clearAll();
         }
@@ -166,7 +148,6 @@ public final class Main extends JavaPlugin {
         if (commandHandler != null) {
             commandHandler.cleanup();
         }
-        
         if (aiClientProvider != null && aiClientProvider.isAvailable()) {
             getLogger().info("Shutting down SignalR client...");
             try {
@@ -175,64 +156,57 @@ public final class Main extends JavaPlugin {
                 getLogger().warning("Error shutting down SignalR client: " + e.getMessage());
             }
         }
-        
         PacketEvents.getAPI().terminate();
-        
         getLogger().info("MLSAC disabled successfully!");
     }
-    
     public void reloadPluginConfig() {
-        reloadConfig();
-        this.config = new Config(this, getLogger());
-        
-        alertManager.setConfig(config);
-        violationManager.setConfig(config);
-        aiCheck.setConfig(config);
-        
-        if (aiClientProvider != null) {
-            aiClientProvider.setConfig(config);
-            if (config.isAiEnabled()) {
-                aiClientProvider.reload().thenAccept(success -> {
-                    if (success) {
-                        getLogger().info("SignalR: Reconnected to " + config.getServerAddress());
+        SchedulerManager.getAdapter().runSync(() -> {
+            try {
+                reloadConfig();
+                this.config = new Config(this, getLogger());
+                alertManager.setConfig(config);
+                violationManager.setConfig(config);
+                aiCheck.setConfig(config);
+                if (aiClientProvider != null) {
+                    aiClientProvider.setConfig(config);
+                    if (config.isAiEnabled()) {
+                        aiClientProvider.reload().thenAccept(success -> {
+                            if (success) {
+                                getLogger().info("SignalR: Reconnected to " + config.getServerAddress());
+                            }
+                        });
+                    } else {
+                        aiClientProvider.shutdown();
                     }
-                });
-            } else {
-                aiClientProvider.shutdown();
+                }
+                getLogger().info("Configuration reloaded!");
+            } catch (Exception e) {
+                getLogger().severe("Failed to reload configuration: " + e.getMessage());
+                e.printStackTrace();
             }
-        }
-        
-        getLogger().info("Configuration reloaded!");
+        });
     }
-    
     public Config getPluginConfig() {
         return config;
     }
-    
     public ISessionManager getSessionManager() {
         return sessionManager;
     }
-    
     public FeatureCalculator getFeatureCalculator() {
         return featureCalculator;
     }
-    
     public AICheck getAiCheck() {
         return aiCheck;
     }
-    
     public AlertManager getAlertManager() {
         return alertManager;
     }
-    
     public ViolationManager getViolationManager() {
         return violationManager;
     }
-    
     public AIClientProvider getAiClientProvider() {
         return aiClientProvider;
     }
-    
     public void debug(String message) {
         if (config != null && config.isDebug()) {
             getLogger().info("[Debug] " + message);
