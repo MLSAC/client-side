@@ -21,39 +21,30 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.data;
 
+package wtf.mlsac.data;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
-
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import wtf.mlsac.util.AimProcessor;
 import wtf.mlsac.util.BufferCalculator;
-
 public class AIPlayerData {
-    
     private final UUID playerId;
-    
     private final AimProcessor aimProcessor;
-    
     private final Deque<TickData> tickBuffer;
     private final int sequence;
-    
     private int ticksSinceAttack;
-    
     private int ticksStep;
-    
     private volatile double buffer;
     private volatile double lastProbability;
-    
     private volatile boolean pendingRequest;
-    
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     public AIPlayerData(UUID playerId) {
         this(playerId, 40);
     }
-    
     public AIPlayerData(UUID playerId, int sequence) {
         this.playerId = playerId;
         this.sequence = sequence;
@@ -65,114 +56,195 @@ public class AIPlayerData {
         this.lastProbability = 0.0;
         this.pendingRequest = false;
     }
-
     public TickData processTick(float yaw, float pitch) {
         TickData tickData = aimProcessor.process(yaw, pitch);
-        
-        if (tickBuffer.size() >= sequence) {
-            tickBuffer.pollFirst();
+        lock.writeLock().lock();
+        try {
+            if (tickBuffer.size() >= sequence) {
+                tickBuffer.pollFirst();
+            }
+            tickBuffer.addLast(tickData);
+        } finally {
+            lock.writeLock().unlock();
         }
-        
-        tickBuffer.addLast(tickData);
-        
         return tickData;
     }
-    
     public void onAttack() {
-        this.ticksSinceAttack = 0;
-    }
-    
-    public void onTeleport() {
-        aimProcessor.reset();
-        clearBuffer();
-    }
-    
-    public void incrementTicksSinceAttack() {
-        if (this.ticksSinceAttack <= sequence + 1) {
-            this.ticksSinceAttack++;
+        lock.writeLock().lock();
+        try {
+            this.ticksSinceAttack = 0;
+        } finally {
+            lock.writeLock().unlock();
         }
     }
-    
-    public void incrementStepCounter() {
-        this.ticksStep++;
+    public void onTeleport() {
+        lock.writeLock().lock();
+        try {
+            aimProcessor.reset();
+            clearBuffer();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
+    public void incrementTicksSinceAttack() {
+        lock.writeLock().lock();
+        try {
+            if (this.ticksSinceAttack <= sequence + 1) {
+                this.ticksSinceAttack++;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+    public void incrementStepCounter() {
+        lock.writeLock().lock();
+        try {
+            this.ticksStep++;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
     @Deprecated
     public void onTick() {
-        ticksSinceAttack++;
-        ticksStep++;
-        
-        if (ticksSinceAttack > sequence) {
-            clearBuffer();
+        lock.writeLock().lock();
+        try {
+            ticksSinceAttack++;
+            ticksStep++;
+            if (ticksSinceAttack > sequence) {
+                clearBuffer();
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
-    
     public boolean shouldSendData(int step, int sequence) {
-        return !pendingRequest && ticksStep >= step && tickBuffer.size() >= sequence;
+        lock.readLock().lock();
+        try {
+            return !pendingRequest && ticksStep >= step && tickBuffer.size() >= sequence;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     public void setPendingRequest(boolean pending) {
-        this.pendingRequest = pending;
+        lock.writeLock().lock();
+        try {
+            this.pendingRequest = pending;
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
     public boolean isPendingRequest() {
-        return pendingRequest;
+        lock.readLock().lock();
+        try {
+            return pendingRequest;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     @Deprecated
     public boolean shouldSendData(int step) {
-        return ticksStep >= step && tickBuffer.size() >= sequence && ticksSinceAttack <= sequence;
+        lock.readLock().lock();
+        try {
+            return ticksStep >= step && tickBuffer.size() >= sequence && ticksSinceAttack <= sequence;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     public void resetStepCounter() {
-        this.ticksStep = 0;
+        lock.writeLock().lock();
+        try {
+            this.ticksStep = 0;
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
     public List<TickData> getTickBuffer() {
-        return new ArrayList<>(tickBuffer);
+        lock.readLock().lock();
+        try {
+            return new ArrayList<>(tickBuffer);
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     public void clearBuffer() {
-        tickBuffer.clear();
+        lock.writeLock().lock();
+        try {
+            tickBuffer.clear();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
     public void fullReset() {
-        tickBuffer.clear();
-        aimProcessor.reset();
-        pendingRequest = false;
+        lock.writeLock().lock();
+        try {
+            tickBuffer.clear();
+            aimProcessor.reset();
+            pendingRequest = false;
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
     public boolean isInCombat() {
-        return ticksSinceAttack <= sequence;
+        lock.readLock().lock();
+        try {
+            return ticksSinceAttack <= sequence;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     public int getBufferSize() {
-        return tickBuffer.size();
+        lock.readLock().lock();
+        try {
+            return tickBuffer.size();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
     public int getSequence() {
         return sequence;
     }
-    
     public int getTicksSinceAttack() {
-        return ticksSinceAttack;
+        lock.readLock().lock();
+        try {
+            return ticksSinceAttack;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
-    public synchronized void updateBuffer(double probability, double multiplier, double decreaseAmount, double threshold) {
-        this.lastProbability = probability;
-        this.buffer = BufferCalculator.updateBuffer(buffer, probability, multiplier, decreaseAmount, threshold);
+    public void updateBuffer(double probability, double multiplier, double decreaseAmount, double threshold) {
+        lock.writeLock().lock();
+        try {
+            this.lastProbability = probability;
+            this.buffer = BufferCalculator.updateBuffer(buffer, probability, multiplier, decreaseAmount, threshold);
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
-    public synchronized boolean shouldFlag(double flagThreshold) {
-        return BufferCalculator.shouldFlag(buffer, flagThreshold);
+    public boolean shouldFlag(double flagThreshold) {
+        lock.readLock().lock();
+        try {
+            return BufferCalculator.shouldFlag(buffer, flagThreshold);
+        } finally {
+            lock.readLock().unlock();
+        }
     }
-    
-    public synchronized void resetBuffer(double resetValue) {
-        this.buffer = BufferCalculator.resetBuffer(resetValue);
+    public void resetBuffer(double resetValue) {
+        lock.writeLock().lock();
+        try {
+            this.buffer = BufferCalculator.resetBuffer(resetValue);
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
-    
     public UUID getPlayerId() { return playerId; }
-    public synchronized double getBuffer() { return buffer; }
+    public double getBuffer() {
+        lock.readLock().lock();
+        try {
+            return buffer;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
     public double getLastProbability() { return lastProbability; }
     public AimProcessor getAimProcessor() { return aimProcessor; }
 }

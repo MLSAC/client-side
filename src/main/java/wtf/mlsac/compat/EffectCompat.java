@@ -6,27 +6,33 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * This file contains code derived from:
+ *   - SlothAC (© 2025 KaelusMC, https://github.com/KaelusMC/SlothAC)
+ *   - Grim (© 2025 GrimAnticheat, https://github.com/GrimAnticheat/Grim)
+ * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.compat;
 
+package wtf.mlsac.compat;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-
 import java.util.HashMap;
 import java.util.Map;
-
 public final class EffectCompat {
-
     private static final Map<String, PotionEffectType> effectCache = new HashMap<>();
-
-    // Effect name mappings: legacy -> modern (1.20.5+)
     private static final Map<String, String> LEGACY_TO_MODERN = new HashMap<>();
     private static final Map<String, String> MODERN_TO_LEGACY = new HashMap<>();
-
     static {
-        // Initialize mappings
         addMapping("SLOW", "SLOWNESS");
         addMapping("JUMP", "JUMP_BOOST");
         addMapping("CONFUSION", "NAUSEA");
@@ -37,40 +43,29 @@ public final class EffectCompat {
         addMapping("HEAL", "INSTANT_HEALTH");
         addMapping("HARM", "INSTANT_DAMAGE");
     }
-
     private static void addMapping(String legacy, String modern) {
         LEGACY_TO_MODERN.put(legacy, modern);
         MODERN_TO_LEGACY.put(modern, legacy);
     }
-
     private EffectCompat() {
     }
-
     public static PotionEffectType getEffect(String name) {
         if (name == null || name.isEmpty()) {
             return null;
         }
-
-        // Check cache first
         if (effectCache.containsKey(name)) {
             return effectCache.get(name);
         }
-
         PotionEffectType effect = resolveEffect(name);
         effectCache.put(name, effect);
         return effect;
     }
-
     private static PotionEffectType resolveEffect(String name) {
-        // Try direct lookup first
         PotionEffectType direct = PotionEffectType.getByName(name);
         if (direct != null) {
             return direct;
         }
-
         VersionAdapter adapter = VersionAdapter.get();
-
-        // If on modern version (1.20.5+), try converting legacy name to modern
         if (adapter.isAtLeast(ServerVersion.V1_20_5)) {
             String modernName = LEGACY_TO_MODERN.get(name);
             if (modernName != null) {
@@ -80,7 +75,6 @@ public final class EffectCompat {
                 }
             }
         } else {
-            // On legacy version, try converting modern name to legacy
             String legacyName = MODERN_TO_LEGACY.get(name);
             if (legacyName != null) {
                 PotionEffectType legacy = PotionEffectType.getByName(legacyName);
@@ -89,44 +83,35 @@ public final class EffectCompat {
                 }
             }
         }
-
         return null;
     }
-
     public static PotionEffectType getSlowness() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "SLOWNESS" : "SLOW");
     }
-
     public static PotionEffectType getJumpBoost() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "JUMP_BOOST" : "JUMP");
     }
-
     public static PotionEffectType getLevitation() {
         return getEffect("LEVITATION");
     }
-
     public static PotionEffectType getResistance() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "RESISTANCE" : "DAMAGE_RESISTANCE");
     }
-
     public static PotionEffectType getNausea() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "NAUSEA" : "CONFUSION");
     }
-
     public static PotionEffectType getHaste() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "HASTE" : "FAST_DIGGING");
     }
-
     public static PotionEffectType getStrength() {
         return getEffect(VersionAdapter.get().isAtLeast(ServerVersion.V1_20_5)
             ? "STRENGTH" : "INCREASE_DAMAGE");
     }
-
     public static boolean applyEffect(Player player, PotionEffectType type,
                                        int duration, int amplifier,
                                        boolean ambient, boolean particles) {
@@ -140,7 +125,6 @@ public final class EffectCompat {
             return false;
         }
     }
-
     public static void removeEffect(Player player, PotionEffectType type) {
         if (player == null || type == null) {
             return;
@@ -150,7 +134,6 @@ public final class EffectCompat {
         } catch (Exception ignored) {
         }
     }
-
     static void clearCache() {
         effectCache.clear();
     }

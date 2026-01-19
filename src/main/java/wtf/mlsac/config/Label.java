@@ -21,13 +21,12 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.config;
 
+package wtf.mlsac.config;
 public enum Label {
     CHEAT,
     LEGIT,
     UNLABELED;
-    
     public static Label fromString(String value) {
         if (value == null) {
             return null;

@@ -21,11 +21,9 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.penalty;
 
+package wtf.mlsac.penalty;
 public interface ActionHandler {
-    
     void handle(String command, PenaltyContext context);
-    
     ActionType getActionType();
 }

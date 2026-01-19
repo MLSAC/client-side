@@ -21,13 +21,11 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.data;
 
+package wtf.mlsac.data;
 import java.util.Locale;
 import java.util.StringJoiner;
-
 public final class TickData {
-    
     public final float deltaYaw;
     public final float deltaPitch;
     public final float accelYaw;
@@ -36,7 +34,6 @@ public final class TickData {
     public final float jerkPitch;
     public final float gcdErrorYaw;
     public final float gcdErrorPitch;
-    
     public TickData(float deltaYaw, float deltaPitch, 
                     float accelYaw, float accelPitch,
                     float jerkYaw, float jerkPitch,
@@ -50,12 +47,10 @@ public final class TickData {
         this.gcdErrorYaw = gcdErrorYaw;
         this.gcdErrorPitch = gcdErrorPitch;
     }
-    
     public static String getHeader() {
         return "is_cheating,delta_yaw,delta_pitch,accel_yaw,accel_pitch,jerk_yaw,jerk_pitch,"
             + "gcd_error_yaw,gcd_error_pitch";
     }
-    
     public String toCsv(String status) {
         int cheatingStatus = status.equalsIgnoreCase("CHEAT") ? 1 : 0;
         StringJoiner joiner = new StringJoiner(",");
@@ -70,13 +65,11 @@ public final class TickData {
         joiner.add(String.format(Locale.US, "%.6f", gcdErrorPitch));
         return joiner.toString();
     }
-    
     @Override
     public String toString() {
         return String.format("TickData[dYaw=%.4f, dPitch=%.4f, aYaw=%.4f, aPitch=%.4f, jYaw=%.4f, jPitch=%.4f, gcdYaw=%.4f, gcdPitch=%.4f]",
             deltaYaw, deltaPitch, accelYaw, accelPitch, jerkYaw, jerkPitch, gcdErrorYaw, gcdErrorPitch);
     }
-    
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
@@ -91,7 +84,6 @@ public final class TickData {
             && Float.compare(gcdErrorYaw, other.gcdErrorYaw) == 0
             && Float.compare(gcdErrorPitch, other.gcdErrorPitch) == 0;
     }
-    
     @Override
     public int hashCode() {
         int result = Float.hashCode(deltaYaw);

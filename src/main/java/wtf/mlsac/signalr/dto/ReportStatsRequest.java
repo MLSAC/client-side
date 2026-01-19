@@ -21,13 +21,11 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.signalr.dto;
 
+package wtf.mlsac.signalr.dto;
 public class ReportStatsRequest {
     public int onlinePlayers;
-    
     public ReportStatsRequest() {}
-    
     public ReportStatsRequest(int onlinePlayers) {
         this.onlinePlayers = onlinePlayers;
     }

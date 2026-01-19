@@ -6,10 +6,23 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * This file contains code derived from:
+ *   - SlothAC (© 2025 KaelusMC, https://github.com/KaelusMC/SlothAC)
+ *   - Grim (© 2025 GrimAnticheat, https://github.com/GrimAnticheat/Grim)
+ * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.compat;
 
+package wtf.mlsac.compat;
 public enum ServerVersion {
     V1_16(16, 0),
     V1_16_5(16, 5),
@@ -22,23 +35,18 @@ public enum ServerVersion {
     V1_21_1(21, 1),
     V1_21_4(21, 4),
     UNKNOWN(0, 0);
-
     private final int minor;
     private final int patch;
-
     ServerVersion(int minor, int patch) {
         this.minor = minor;
         this.patch = patch;
     }
-
     public int getMinor() {
         return minor;
     }
-
     public int getPatch() {
         return patch;
     }
-
     public boolean isAtLeast(ServerVersion other) {
         if (this == UNKNOWN || other == UNKNOWN) {
             return this == other;
@@ -48,67 +56,53 @@ public enum ServerVersion {
         }
         return this.patch >= other.patch;
     }
-
     public boolean isBelow(ServerVersion other) {
         if (this == UNKNOWN || other == UNKNOWN) {
             return false;
         }
         return !isAtLeast(other);
     }
-
     public boolean isBetween(ServerVersion min, ServerVersion max) {
         return isAtLeast(min) && isBelow(max);
     }
-
     public static ServerVersion fromString(String versionString) {
         if (versionString == null || versionString.isEmpty()) {
             return UNKNOWN;
         }
-
         try {
             String version = versionString.split("-")[0];
             String[] parts = version.split("\\.");
-
             if (parts.length < 2) {
                 return UNKNOWN;
             }
-
             int major = Integer.parseInt(parts[0]);
             int minor = Integer.parseInt(parts[1]);
             int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
-
             if (major != 1) {
                 return UNKNOWN;
             }
-
             return findBestMatch(minor, patch);
         } catch (NumberFormatException e) {
             return UNKNOWN;
         }
     }
-
     private static ServerVersion findBestMatch(int minor, int patch) {
         ServerVersion bestMatch = UNKNOWN;
-
         for (ServerVersion v : values()) {
             if (v == UNKNOWN) continue;
-
             if (v.minor == minor && v.patch <= patch) {
-                // Same minor version, patch must be <= target
                 if (v.patch == patch) {
-                    return v; // Exact match
+                    return v;
                 }
                 if (bestMatch == UNKNOWN || bestMatch.minor < minor || v.patch > bestMatch.patch) {
                     bestMatch = v;
                 }
             } else if (v.minor < minor) {
-                // Lower minor version - only use if we haven't found same minor match
                 if (bestMatch == UNKNOWN || (bestMatch.minor < minor && v.minor > bestMatch.minor)) {
                     bestMatch = v;
                 }
             }
         }
-
         return bestMatch;
     }
 }

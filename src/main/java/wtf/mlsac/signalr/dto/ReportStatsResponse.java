@@ -21,11 +21,10 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.signalr.dto;
 
+package wtf.mlsac.signalr.dto;
 public class ReportStatsResponse {
     public boolean limitExceeded;
     public int maxOnline;
-    
     public ReportStatsResponse() {}
 }

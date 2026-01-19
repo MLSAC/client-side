@@ -21,14 +21,12 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.signalr.dto;
 
+package wtf.mlsac.signalr.dto;
 public class ConnectRequest {
     public String apiKey;
     public String pluginHash;
-    
     public ConnectRequest() {}
-    
     public ConnectRequest(String apiKey, String pluginHash) {
         this.apiKey = apiKey;
         this.pluginHash = pluginHash;

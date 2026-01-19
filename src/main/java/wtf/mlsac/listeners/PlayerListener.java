@@ -21,9 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-package wtf.mlsac.listeners;
 
-import org.bukkit.Bukkit;
+package wtf.mlsac.listeners;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -32,22 +31,19 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-
 import wtf.mlsac.Permissions;
 import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.checks.AICheck;
+import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.session.SessionManager;
 import wtf.mlsac.violation.ViolationManager;
-
 public class PlayerListener implements Listener {
-    
     private final JavaPlugin plugin;
     private final AICheck aiCheck;
     private final AlertManager alertManager;
     private final ViolationManager violationManager;
     private final SessionManager sessionManager;
     private HitListener hitListener;
-    
     public PlayerListener(JavaPlugin plugin, AICheck aiCheck, AlertManager alertManager, 
                           ViolationManager violationManager, SessionManager sessionManager) {
         this.plugin = plugin;
@@ -56,43 +52,39 @@ public class PlayerListener implements Listener {
         this.violationManager = violationManager;
         this.sessionManager = sessionManager;
     }
-    
     public void setHitListener(HitListener hitListener) {
         this.hitListener = hitListener;
     }
-    
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        
         if (hitListener != null) {
             hitListener.cacheEntity(player);
         }
-        
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (player.isOnline()) {
-                if (player.hasPermission(Permissions.ALERTS) || player.hasPermission(Permissions.ADMIN)) {
-                    alertManager.enableAlerts(player);
+        try {
+            SchedulerManager.getAdapter().runSyncDelayed(() -> {
+                if (player.isOnline()) {
+                    if (player.hasPermission(Permissions.ALERTS) || player.hasPermission(Permissions.ADMIN)) {
+                        alertManager.enableAlerts(player);
+                    }
                 }
-            }
-        }, 20L);
+            }, 20L);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to schedule player join task: " + e.getMessage());
+        }
     }
-    
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
         handlePlayerLeave(event.getPlayer());
     }
-    
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerKick(PlayerKickEvent event) {
         handlePlayerLeave(event.getPlayer());
     }
-    
     private void handlePlayerLeave(Player player) {
         if (hitListener != null) {
             hitListener.uncachePlayer(player);
         }
-        
         if (aiCheck != null) {
             aiCheck.handlePlayerQuit(player);
         }
