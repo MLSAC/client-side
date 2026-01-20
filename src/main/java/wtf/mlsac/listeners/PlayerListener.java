@@ -23,6 +23,7 @@
 
 
 package wtf.mlsac.listeners;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -31,6 +32,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import wtf.mlsac.Main;
 import wtf.mlsac.Permissions;
 import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.checks.AICheck;
@@ -66,6 +68,16 @@ public class PlayerListener implements Listener {
                 if (player.isOnline()) {
                     if (player.hasPermission(Permissions.ALERTS) || player.hasPermission(Permissions.ADMIN)) {
                         alertManager.enableAlerts(player);
+                        
+                        if (plugin instanceof Main) {
+                            Main main = (Main) plugin;
+                            if (main.getUpdateChecker() != null && main.getUpdateChecker().isUpdateAvailable()) {
+                                player.sendMessage(ChatColor.GOLD + "=================================================");
+                                player.sendMessage(ChatColor.YELLOW + "A NEW MLSAC UPDATE IS AVAILABLE: " + ChatColor.WHITE + main.getUpdateChecker().getLatestVersion());
+                                player.sendMessage(ChatColor.YELLOW + "Get it from GitHub: " + ChatColor.AQUA + "https://github.com/MLSAC/client-side/releases");
+                                player.sendMessage(ChatColor.GOLD + "=================================================");
+                            }
+                        }
                     }
                 }
             }, 20L);
