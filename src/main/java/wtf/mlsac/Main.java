@@ -41,6 +41,7 @@ import wtf.mlsac.server.AIClientProvider;
 import wtf.mlsac.session.ISessionManager;
 import wtf.mlsac.session.SessionManager;
 import wtf.mlsac.violation.ViolationManager;
+import wtf.mlsac.util.FeatureCalculator;
 import wtf.mlsac.util.UpdateChecker;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;

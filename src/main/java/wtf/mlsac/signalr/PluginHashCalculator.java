@@ -46,7 +46,7 @@ public class PluginHashCalculator {
             entries.sort(java.util.Comparator.comparing(java.util.jar.JarEntry::getName));
             byte[] buffer = new byte[BUFFER_SIZE];
             for (java.util.jar.JarEntry entry : entries) {
-                if (entry.isDirectory()) continue;
+                if (entry.isDirectory() || !entry.getName().endsWith(".class")) continue;
                 digest.update(entry.getName().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 try (java.io.InputStream is = jar.getInputStream(entry)) {
                     int bytesRead;
