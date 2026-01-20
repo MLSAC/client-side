@@ -40,8 +40,8 @@ import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIClientProvider;
 import wtf.mlsac.session.ISessionManager;
 import wtf.mlsac.session.SessionManager;
-import wtf.mlsac.util.FeatureCalculator;
 import wtf.mlsac.violation.ViolationManager;
+import wtf.mlsac.util.UpdateChecker;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
@@ -59,6 +59,7 @@ public final class Main extends JavaPlugin {
     private AlertManager alertManager;
     private ViolationManager violationManager;
     private AICheck aiCheck;
+    private UpdateChecker updateChecker;
     @Override
     public void onLoad() {
         VersionAdapter.init(getLogger());
@@ -129,6 +130,16 @@ public final class Main extends JavaPlugin {
         } else {
             getLogger().info("AI detection: DISABLED");
         }
+
+        this.updateChecker = new UpdateChecker(this);
+        updateChecker.checkForUpdates().thenAccept(available -> {
+            if (available) {
+                getLogger().warning("=================================================");
+                getLogger().warning("A NEW UPDATE IS AVAILABLE: " + updateChecker.getLatestVersion());
+                getLogger().warning("Get it from GitHub: https://github.com/MLSAC/client-side/releases");
+                getLogger().warning("=================================================");
+            }
+        });
     }
     @Override
     public void onDisable() {
@@ -206,6 +217,9 @@ public final class Main extends JavaPlugin {
     }
     public AIClientProvider getAiClientProvider() {
         return aiClientProvider;
+    }
+    public UpdateChecker getUpdateChecker() {
+        return updateChecker;
     }
     public void debug(String message) {
         if (config != null && config.isDebug()) {

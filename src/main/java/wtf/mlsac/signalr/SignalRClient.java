@@ -36,10 +36,8 @@ public class SignalRClient implements IAIClient {
     private static final int SHUTDOWN_TIMEOUT_SECONDS = 5;
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_BACKOFF_MS = 1000;
-    private static final int MAX_RECONNECT_ATTEMPTS = 10;
-    private static final long RECONNECT_INITIAL_DELAY_MS = 5000;
-    private static final long RECONNECT_MAX_DELAY_MS = 300000;
-    private static final double RECONNECT_BACKOFF_MULTIPLIER = 2.0;
+    private static final int MAX_RECONNECT_ATTEMPTS = Integer.MAX_VALUE;
+    private static final long RECONNECT_INTERVAL_MS = 10000;
     private final JavaPlugin plugin;
     private final String serverAddress;
     private final String apiKey;
@@ -57,6 +55,7 @@ public class SignalRClient implements IAIClient {
     private volatile boolean shuttingDown = false;
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final AtomicInteger autoReconnectAttempts = new AtomicInteger(0);
+    private volatile CompletableFuture<Boolean> connectionFuture = null;
     public SignalRClient(JavaPlugin plugin, String serverAddress, String apiKey,
                          int reportStatsIntervalSeconds, IntSupplier onlinePlayersSupplier, boolean debug) {
         this.plugin = plugin;
@@ -67,39 +66,65 @@ public class SignalRClient implements IAIClient {
         this.onlinePlayersSupplier = onlinePlayersSupplier;
         this.debug = debug;
     }
-    public CompletableFuture<Boolean> connect() {
-        return CompletableFuture.supplyAsync(() -> {
+    public synchronized CompletableFuture<Boolean> connect() {
+        if (connectionFuture != null && !connectionFuture.isDone()) {
+            return connectionFuture;
+        }
+
+        connectionFuture = CompletableFuture.supplyAsync(() -> {
             try {
-                this.pluginHash = PluginHashCalculator.calculatePluginHash(plugin);
+                if (pluginHash == null || pluginHash.isEmpty()) {
+                    this.pluginHash = PluginHashCalculator.calculatePluginHash(plugin);
+                }
+                
                 if (pluginHash.isEmpty()) {
                     logger.warning("[SignalR] Plugin hash calculation failed, using empty hash");
                 }
-                SignalREndpointConfigLoader configLoader = new SignalREndpointConfigLoader(logger);
-                try {
-                    this.endpointConfig = configLoader.loadSync(serverAddress);
-                } catch (Exception e) {
-                    logger.warning("[SignalR] Failed to load endpoint config, using defaults: " + e.getMessage());
-                    this.endpointConfig = SignalREndpointConfig.defaults();
+
+                if (this.endpointConfig == null) {
+                    SignalREndpointConfigLoader configLoader = new SignalREndpointConfigLoader(logger);
+                    try {
+                        this.endpointConfig = configLoader.loadSync(serverAddress);
+                    } catch (Exception e) {
+                        logger.warning("[SignalR] Failed to load endpoint config, using defaults: " + e.getMessage());
+                        this.endpointConfig = SignalREndpointConfig.defaults();
+                    }
                 }
-                this.sessionManager = new SignalRSessionManager(serverAddress, endpointConfig, logger, debug);
-                sessionManager.initialize();
-                sessionManager.setOnDisconnectedCallback(this::handleDisconnection);
-                sessionManager.startConnection().join();
+
+                if (this.sessionManager == null) {
+                    this.sessionManager = new SignalRSessionManager(serverAddress, endpointConfig, logger, debug);
+                    sessionManager.initialize();
+                    sessionManager.setOnDisconnectedCallback(this::handleDisconnection);
+                }
+
+                if (sessionManager.getConnectionState() != com.microsoft.signalr.HubConnectionState.CONNECTED) {
+                    sessionManager.startConnection().join();
+                }
+
                 String sessionId = sessionManager.createSession(apiKey, pluginHash).join();
                 if (sessionId == null || sessionId.isEmpty()) {
                     throw new RuntimeException("Failed to create session");
                 }
-                this.reportStatsScheduler = new SignalRReportStatsScheduler(
-                    plugin, sessionManager, onlinePlayersSupplier);
-                reportStatsScheduler.setOnLimitExceededCallback(() -> 
-                    logger.warning("[SignalR] Online limit exceeded - Predict blocked"));
-                reportStatsScheduler.setOnLimitClearedCallback(() -> 
-                    logger.info("[SignalR] Online limit cleared - Predict enabled"));
-                reportStatsScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+
+                if (this.reportStatsScheduler == null) {
+                    this.reportStatsScheduler = new SignalRReportStatsScheduler(
+                        plugin, sessionManager, onlinePlayersSupplier);
+                    reportStatsScheduler.setOnLimitExceededCallback(() -> 
+                        logger.warning("[SignalR] Online limit exceeded - Predict blocked"));
+                    reportStatsScheduler.setOnLimitClearedCallback(() -> 
+                        logger.info("[SignalR] Online limit cleared - Predict enabled"));
+                    reportStatsScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+                }
+                
                 reportStatsScheduler.start(reportStatsIntervalSeconds);
-                this.heartbeatScheduler = new SignalRHeartbeatScheduler(plugin, sessionManager);
-                heartbeatScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+
+                if (this.heartbeatScheduler == null) {
+                    this.heartbeatScheduler = new SignalRHeartbeatScheduler(plugin, sessionManager);
+                    heartbeatScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+                }
+                
                 heartbeatScheduler.start();
+
                 connected = true;
                 reconnectAttempts.set(0);
                 autoReconnectAttempts.set(0);
@@ -110,11 +135,13 @@ public class SignalRClient implements IAIClient {
                 connected = false;
                 return false;
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "[SignalR] Connection failed: " + e.getMessage(), e);
+                logger.log(Level.SEVERE, "[SignalR] Connection failed: " + e.getMessage());
                 connected = false;
                 return false;
             }
         });
+        
+        return connectionFuture;
     }
     public CompletableFuture<Boolean> connectWithRetry() {
         return connectWithRetry(0);
@@ -207,16 +234,11 @@ public class SignalRClient implements IAIClient {
     }
     private void scheduleReconnect() {
         int attempt = autoReconnectAttempts.incrementAndGet();
-        if (attempt > MAX_RECONNECT_ATTEMPTS) {
-            logger.severe("[SignalR] Max reconnect attempts (" + MAX_RECONNECT_ATTEMPTS + 
-                ") reached, giving up. Manual reconnect required.");
-            autoReconnectAttempts.set(0);
-            return;
-        }
-        long delayMs = calculateReconnectDelay(attempt);
+        long delayMs = RECONNECT_INTERVAL_MS;
         long delaySeconds = delayMs / 1000;
-        logger.info("[SignalR] Scheduling reconnect attempt " + attempt + "/" + MAX_RECONNECT_ATTEMPTS + 
-            " in " + delaySeconds + " seconds...");
+        
+        logger.info("[SignalR] Scheduling reconnect attempt " + attempt + " in " + delaySeconds + " seconds...");
+        
         long delayTicks = delayMs / 50;
         SchedulerManager.getAdapter().runAsyncDelayed(this::attemptReconnect, delayTicks);
     }
@@ -246,8 +268,7 @@ public class SignalRClient implements IAIClient {
         });
     }
     private long calculateReconnectDelay(int attempt) {
-        double delay = RECONNECT_INITIAL_DELAY_MS * Math.pow(RECONNECT_BACKOFF_MULTIPLIER, attempt - 1);
-        return Math.min((long) delay, RECONNECT_MAX_DELAY_MS);
+        return RECONNECT_INTERVAL_MS;
     }
     public void setAutoReconnectEnabled(boolean enabled) {
         this.autoReconnectEnabled = enabled;
