@@ -72,26 +72,30 @@ public class HitListener extends PacketListenerAbstract {
     }
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
-        if (event.getPacketType() != PacketType.Play.Client.INTERACT_ENTITY) {
-            return;
+        try {
+            if (event.getPacketType() != PacketType.Play.Client.INTERACT_ENTITY) {
+                return;
+            }
+            WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
+            if (packet.getAction() != WrapperPlayClientInteractEntity.InteractAction.ATTACK) {
+                return;
+            }
+            Player attacker = (Player) event.getPlayer();
+            if (attacker == null) {
+                return;
+            }
+            int targetId = packet.getEntityId();
+            Player target = getPlayerById(targetId);
+            if (target == null) {
+                return;
+            }
+            if (aiCheck != null) {
+                aiCheck.onAttack(attacker, target);
+            }
+            sessionManager.onAttack(attacker);
+        } catch (Exception e) {
+            // Silently ignore packet errors to prevent kicks
         }
-        WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
-        if (packet.getAction() != WrapperPlayClientInteractEntity.InteractAction.ATTACK) {
-            return;
-        }
-        Player attacker = (Player) event.getPlayer();
-        if (attacker == null) {
-            return;
-        }
-        int targetId = packet.getEntityId();
-        Player target = getPlayerById(targetId);
-        if (target == null) {
-            return;
-        }
-        if (aiCheck != null) {
-            aiCheck.onAttack(attacker, target);
-        }
-        sessionManager.onAttack(attacker);
     }
     private Player getPlayerById(int entityId) {
         UUID uuid = playerIdCache.get(entityId);

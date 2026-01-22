@@ -67,7 +67,9 @@ public final class Main extends JavaPlugin {
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().getSettings()
             .reEncodeByDefault(false)
-            .checkForUpdates(false);
+            .checkForUpdates(false)
+            .bStats(false)
+            .debug(false);
         PacketEvents.getAPI().load();
     }
     @Override

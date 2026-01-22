@@ -40,24 +40,28 @@ public class RotationListener extends PacketListenerAbstract {
     }
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
-        if (!WrapperPlayClientPlayerFlying.isFlying(event.getPacketType())) {
-            return;
-        }
-        Player player = (Player) event.getPlayer();
-        if (player == null) {
-            return;
-        }
-        WrapperPlayClientPlayerFlying packet = new WrapperPlayClientPlayerFlying(event);
-        if (!packet.hasRotationChanged()) {
-            return;
-        }
-        float yaw = packet.getLocation().getYaw();
-        float pitch = packet.getLocation().getPitch();
-        if (aiCheck != null) {
-            aiCheck.onRotationPacket(player, yaw, pitch);
-        }
-        if (sessionManager.hasActiveSession(player)) {
-            sessionManager.onTick(player, yaw, pitch);
+        try {
+            if (!WrapperPlayClientPlayerFlying.isFlying(event.getPacketType())) {
+                return;
+            }
+            Player player = (Player) event.getPlayer();
+            if (player == null) {
+                return;
+            }
+            WrapperPlayClientPlayerFlying packet = new WrapperPlayClientPlayerFlying(event);
+            if (!packet.hasRotationChanged()) {
+                return;
+            }
+            float yaw = packet.getLocation().getYaw();
+            float pitch = packet.getLocation().getPitch();
+            if (aiCheck != null) {
+                aiCheck.onRotationPacket(player, yaw, pitch);
+            }
+            if (sessionManager.hasActiveSession(player)) {
+                sessionManager.onTick(player, yaw, pitch);
+            }
+        } catch (Exception e) {
+            // Silently ignore packet errors to prevent kicks
         }
     }
 }
