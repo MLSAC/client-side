@@ -32,11 +32,10 @@ repositories {
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT"
-    compileOnly "dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT"
-    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.7'
-    implementation 'com.github.retrooper:packetevents-spigot:2.7.0'
-    implementation 'com.google.flatbuffers:flatbuffers-java:23.5.26'
+    compileOnly "io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT"
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
+    compileOnly 'com.github.retrooper:packetevents-spigot:2.11.1'
+    implementation 'com.google.flatbuffers:flatbuffers-java:24.3.25'
     implementation 'com.microsoft.signalr:signalr:8.0.0'
     implementation 'com.microsoft.signalr.messagepack:signalr-messagepack:8.0.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
@@ -50,20 +49,69 @@ dependencies {
     testImplementation 'com.github.seeseemelk:MockBukkit-v1.16:1.5.2'
 }
 
-def targetJavaVersion = 17
+dependencies {
+    implementation 'com.github.retrooper:packetevents-spigot:2.11.1'
+}
+
+// Multi-build configuration for Java 17 and 21
+def javaVersions = [17, 21]
+def defaultJavaVersion = 21
+
 java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    def javaVersion = JavaVersion.toVersion(defaultJavaVersion)
     sourceCompatibility = javaVersion
     targetCompatibility = javaVersion
     if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+        toolchain.languageVersion = JavaLanguageVersion.of(defaultJavaVersion)
+    }
+}
+
+// Create source sets for each Java version
+javaVersions.each { javaVer ->
+    sourceSets {
+        create("java${javaVer}") {
+            java {
+                srcDirs = sourceSets.main.java.srcDirs
+            }
+            resources {
+                srcDirs = sourceSets.main.resources.srcDirs
+            }
+            compileClasspath = sourceSets.main.compileClasspath
+            runtimeClasspath = sourceSets.main.runtimeClasspath
+        }
+    }
+    
+    // Configure compilation for this Java version
+    tasks.named("compileJava${javaVer}Java", JavaCompile) {
+        options.encoding = 'UTF-8'
+        options.release.set(javaVer)
+        if (JavaVersion.current() < JavaVersion.toVersion(javaVer)) {
+            javaCompiler = javaToolchains.compilerFor {
+                languageVersion = JavaLanguageVersion.of(javaVer)
+            }
+        }
+    }
+    
+    tasks.named("processJava${javaVer}Resources", ProcessResources) {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        def props = [version: version]
+        inputs.properties props
+        filteringCharset 'UTF-8'
+        filesMatching('plugin.yml') {
+            expand props
+        }
+        filesMatching('plugin-depend.yml') {
+            expand props
+        }
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release.set(targetJavaVersion)
+    if (defaultJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        if (!options.release.isPresent()) {
+            options.release.set(defaultJavaVersion)
+        }
     }
 }
 
@@ -77,25 +125,73 @@ processResources {
     }
 }
 
-shadowJar {
-    archiveClassifier.set('')
+// Helper method to configure shadow jar (standalone with PacketEvents)
+def configureShadowJar(task, classifier, sourceSetName, javaVersion = null) {
+    task.archiveClassifier.set(classifier)
     
-    exclude 'META-INF/*.SF'
-    exclude 'META-INF/*.DSA'
-    exclude 'META-INF/*.RSA'
+    // Use specific source set
+    task.from sourceSets[sourceSetName].output
     
-    relocate 'com.google.flatbuffers', 'net.mlsac.libs.flatbuffers'
-    relocate 'com.github.retrooper.packetevents', 'net.mlsac.libs.packetevents.api'
-    relocate 'io.github.retrooper.packetevents', 'net.mlsac.libs.packetevents.impl'
-    relocate 'com.google.common', 'net.mlsac.libs.guava'
-    relocate 'com.google.gson', 'net.mlsac.libs.gson'
-    relocate 'com.microsoft.signalr', 'net.mlsac.libs.signalr'
-    relocate 'org.msgpack', 'net.mlsac.libs.msgpack'
-    relocate 'okhttp3', 'net.mlsac.libs.okhttp3'
-    relocate 'okio', 'net.mlsac.libs.okio'
+    // Include all runtime dependencies (including PacketEvents)
+    task.configurations = [project.configurations.runtimeClasspath]
+    
+    // Exclude signature files
+    task.exclude 'META-INF/*.SF'
+    task.exclude 'META-INF/*.DSA'
+    task.exclude 'META-INF/*.RSA'
+    
+    task.mergeServiceFiles()
+    
+    // Relocate packages (DON'T relocate PacketEvents to avoid conflicts)
+    task.relocate 'com.google.flatbuffers', 'net.mlsac.libs.flatbuffers'
+    task.relocate 'com.google.common', 'net.mlsac.libs.guava'
+    task.relocate 'com.google.gson', 'net.mlsac.libs.gson'
+    task.relocate 'com.microsoft.signalr', 'net.mlsac.libs.signalr'
+    task.relocate 'org.msgpack', 'net.mlsac.libs.msgpack'
+    task.relocate 'okhttp3', 'net.mlsac.libs.okhttp3'
+    task.relocate 'okio', 'net.mlsac.libs.okio'
+    
+    // Preserve original structure
+    task.preserveFileTimestamps = false
+    task.reproducibleFileOrder = true
+    task.zip64 = true
+    
+    if (javaVersion != null) {
+        task.manifest {
+            attributes(
+                'Multi-Release': 'true',
+                'Build-Java-Version': javaVersion
+            )
+        }
+    }
 }
 
-build.dependsOn shadowJar
+shadowJar {
+    configureShadowJar(it, 'java21', 'main', 21)
+}
+
+// Create standalone builds for each Java version
+javaVersions.each { javaVer ->
+    def taskName = "shadowJarJava${javaVer}"
+    def sourceSetName = "java${javaVer}"
+    
+    tasks.register(taskName, com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+        dependsOn "compileJava${javaVer}Java", "processJava${javaVer}Resources"
+        configureShadowJar(it, "java${javaVer}", sourceSetName, javaVer)
+    }
+}
+
+
+// Task to build all versions
+task buildAll {
+    dependsOn shadowJar
+    javaVersions.each { javaVer ->
+        dependsOn "shadowJarJava${javaVer}"
+    }
+}
+
+// Make buildAll the default build task
+build.dependsOn buildAll
 
 test {
     useJUnitPlatform()

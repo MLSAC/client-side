@@ -29,4 +29,13 @@ public class ReportStatsRequest {
     public ReportStatsRequest(int onlinePlayers) {
         this.onlinePlayers = onlinePlayers;
     }
+    
+    // Геттеры для правильной сериализации
+    public int getOnlinePlayers() {
+        return onlinePlayers;
+    }
+    
+    public void setOnlinePlayers(int onlinePlayers) {
+        this.onlinePlayers = onlinePlayers;
+    }
 }

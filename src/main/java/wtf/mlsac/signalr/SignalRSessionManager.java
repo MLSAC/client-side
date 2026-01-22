@@ -56,6 +56,9 @@ public class SignalRSessionManager {
     }
     public void initialize() {
         this.hubConnection = HubConnectionBuilder.create(hubUrl)
+            .setHttpClientBuilderCallback(builder -> {
+                builder.addInterceptor(new SignalRNegotiateInterceptor(logger, debug));
+            })
             .withTransport(TransportEnum.WEBSOCKETS)
             .withHubProtocol(new MessagePackHubProtocol())
             .withServerTimeout(SERVER_TIMEOUT_MS)
@@ -144,23 +147,93 @@ public class SignalRSessionManager {
     }
     public CompletableFuture<ReportStatsResult> reportStats(int onlinePlayers) {
         if (!isSessionValid()) {
+            logger.warning("[SignalR] Cannot call ReportStats - no active session");
             return CompletableFuture.completedFuture(
                 new ReportStatsResult(false, false, 0, "No active session"));
         }
+        
+        // Проверка состояния подключения
+        HubConnectionState state = hubConnection.getConnectionState();
+        if (state != HubConnectionState.CONNECTED) {
+            logger.severe("[SignalR] Cannot call ReportStats - not connected! State: " + state);
+            return CompletableFuture.completedFuture(
+                new ReportStatsResult(false, false, 0, "Not connected, state: " + state));
+        }
+        
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String methodName = endpointConfig.getMethodName("reportStats");
                 ReportStatsRequest request = new ReportStatsRequest(onlinePlayers);
-                ReportStatsResponse response = hubConnection.invoke(ReportStatsResponse.class, methodName, request)
-                    .blockingGet();
+                
+                logger.info("[SignalR] Connection state OK, calling ReportStats...");
+                logger.info("[SignalR] Preparing to call " + methodName + " with onlinePlayers=" + onlinePlayers);
+                
+                // Логирование JSON для отладки
+                if (debug) {
+                    try {
+                        com.google.gson.Gson gson = new com.google.gson.Gson();
+                        String json = gson.toJson(request);
+                        logger.info("[SignalR] ReportStats request JSON: " + json);
+                    } catch (Exception jsonEx) {
+                        logger.warning("[SignalR] Failed to serialize request to JSON: " + jsonEx.getMessage());
+                    }
+                }
+                
+                logger.info("[SignalR] ReportStats invoked, waiting for response...");
+                
+                // Вызов с timeout через get() с таймаутом
+                ReportStatsResponse response;
+                try {
+                    response = hubConnection.invoke(ReportStatsResponse.class, methodName, request)
+                        .timeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                        .toFuture()
+                        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (java.util.concurrent.TimeoutException timeoutEx) {
+                    logger.severe("[SignalR] ReportStats timeout after 5 seconds");
+                    logger.severe("[SignalR] Exception type: " + timeoutEx.getClass().getName());
+                    logger.severe("[SignalR] Exception message: " + timeoutEx.getMessage());
+                    return new ReportStatsResult(false, false, 0, "Timeout after 5 seconds");
+                } catch (java.util.concurrent.ExecutionException execEx) {
+                    // Разворачиваем ExecutionException для получения реальной причины
+                    Throwable cause = execEx.getCause();
+                    if (cause != null) {
+                        throw cause;
+                    }
+                    throw execEx;
+                }
+                
+                logger.info("[SignalR] ReportStats completed successfully!");
+                
                 boolean limitExceeded = response != null && response.limitExceeded;
                 int maxOnline = response != null ? response.maxOnline : 0;
+                
+                if (debug) {
+                    logger.info("[SignalR] ReportStats response: limitExceeded=" + limitExceeded + 
+                        ", maxOnline=" + maxOnline);
+                }
+                
                 return new ReportStatsResult(true, limitExceeded, maxOnline, null);
-            } catch (Exception e) {
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.severe("[SignalR] ReportStats interrupted");
+                logger.severe("[SignalR] Exception type: " + e.getClass().getName());
+                return new ReportStatsResult(false, false, 0, "Interrupted");
+                
+            } catch (Throwable e) {
+                logger.severe("[SignalR] ReportStats failed with exception");
+                logger.severe("[SignalR] Exception type: " + e.getClass().getName());
+                logger.severe("[SignalR] Exception message: " + e.getMessage());
+                
                 HubErrorParser.HubError hubError = HubErrorParser.parse(e.getMessage());
+                logger.severe("[SignalR] Parsed error code: " + hubError.getCode());
+                logger.severe("[SignalR] Parsed error message: " + hubError.getMessage());
+                
                 if (HubErrorParser.NOT_AUTHENTICATED.equals(hubError.getCode())) {
                     this.sessionValid = false;
+                    logger.warning("[SignalR] Session invalidated due to NOT_AUTHENTICATED error");
                 }
+                
                 return new ReportStatsResult(false, false, 0, hubError.getMessage());
             }
         });
