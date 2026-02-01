@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac;
+
 import com.github.retrooper.packetevents.PacketEvents;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import wtf.mlsac.alert.AlertManager;
@@ -46,6 +46,7 @@ import wtf.mlsac.util.UpdateChecker;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
+
 public final class Main extends JavaPlugin {
     private Config config;
     private ISessionManager sessionManager;
@@ -61,17 +62,19 @@ public final class Main extends JavaPlugin {
     private ViolationManager violationManager;
     private AICheck aiCheck;
     private UpdateChecker updateChecker;
+
     @Override
     public void onLoad() {
         VersionAdapter.init(getLogger());
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().getSettings()
-            .reEncodeByDefault(false)
-            .checkForUpdates(false)
-            .bStats(false)
-            .debug(false);
+                .reEncodeByDefault(false)
+                .checkForUpdates(false)
+                .bStats(false)
+                .debug(false);
         PacketEvents.getAPI().load();
     }
+
     @Override
     public void onEnable() {
         try {
@@ -109,8 +112,8 @@ public final class Main extends JavaPlugin {
         this.tickListener = new TickListener(this, sessionManager, aiCheck);
         this.hitListener = new HitListener(sessionManager, aiCheck);
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
-        this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager, 
-            sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null);
+        this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager,
+                sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null, tickListener);
         this.teleportListener = new TeleportListener(aiCheck);
         this.tickListener.setHitListener(hitListener);
         this.playerListener.setHitListener(hitListener);
@@ -144,6 +147,7 @@ public final class Main extends JavaPlugin {
             }
         });
     }
+
     @Override
     public void onDisable() {
         if (tickListener != null) {
@@ -173,6 +177,7 @@ public final class Main extends JavaPlugin {
         PacketEvents.getAPI().terminate();
         getLogger().info("MLSAC disabled successfully!");
     }
+
     public void reloadPluginConfig() {
         SchedulerManager.getAdapter().runSync(() -> {
             try {
@@ -200,30 +205,39 @@ public final class Main extends JavaPlugin {
             }
         });
     }
+
     public Config getPluginConfig() {
         return config;
     }
+
     public ISessionManager getSessionManager() {
         return sessionManager;
     }
+
     public FeatureCalculator getFeatureCalculator() {
         return featureCalculator;
     }
+
     public AICheck getAiCheck() {
         return aiCheck;
     }
+
     public AlertManager getAlertManager() {
         return alertManager;
     }
+
     public ViolationManager getViolationManager() {
         return violationManager;
     }
+
     public AIClientProvider getAiClientProvider() {
         return aiClientProvider;
     }
+
     public UpdateChecker getUpdateChecker() {
         return updateChecker;
     }
+
     public void debug(String message) {
         if (config != null && config.isDebug()) {
             getLogger().info("[Debug] " + message);
