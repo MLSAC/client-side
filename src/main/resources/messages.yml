@@ -1,0 +1,55 @@
+prefix: "&6[MLSAC] &r"
+
+alerts-enabled: "&aAlerts enabled"
+alerts-disabled: "&eAlerts disabled"
+alert-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER}"
+alert-format-vl: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &cVL: {VL}"
+
+unknown-command: "&cUnknown command: &f{ARGS}"
+players-only: "&cThis command is for players only"
+no-permission: "&cYou don't have permission"
+player-not-found: "&cPlayer not found: &f{PLAYER}"
+config-reloaded: "&aConfiguration reloaded!"
+
+tracking-stopped: "&eTracking stopped"
+tracking-started: "&aTracking player &f{PLAYER}&a. Use &f/mlsac prob &aagain to stop"
+prob-usage: "&eUsage: &f/mlsac prob <player>"
+player-offline: "&cPlayer is offline"
+
+actionbar-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &eBuffer: &f{BUFFER} &7| &2VL: &f{VL}"
+
+data-status-header: "&e=== Data Collection Status ==="
+active-sessions: "&fActive sessions: &e{COUNT}"
+no-active-sessions: "&7No active data collection sessions"
+start-hint: "&7Use &e/mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> &7to start"
+session-started: "&aStarted &f{LABEL} &asession for &f{COUNT} &aplayer(s)"
+session-stopped: "&eStopped session for &f{PLAYER}"
+all-sessions-stopped: "&eStopped &f{COUNT} &esessions"
+no-sessions-to-stop: "&7No active sessions to stop"
+no-players-online: "&cNo players online"
+invalid-label: "&cInvalid label: &f{LABEL}"
+valid-labels: "&7Available labels: &aCHEAT, LEGIT, UNLABELED"
+
+usage-header: "&eUsage:"
+usage-start: "&7  /mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> \"<comment>\""
+usage-stop: "&7  /mlsac stop <NICK|GLOBAL>"
+usage-alerts: "&7  /mlsac alerts - Toggle AI alerts"
+usage-prob: "&7  /mlsac prob <player> - Track probability (actionbar)"
+usage-datastatus: "&7  /mlsac datastatus - Data collection status"
+usage-reload: "&7  /mlsac reload - Reload configuration"
+usage-suspects: "&7  /mlsac suspects - Open the suspects GUI"
+usage-punish: "&7  /mlsac punish <player> - Execute max punishment"
+usage-profile: "&7  /mlsac profile <player> - View player profile"
+
+suspects-teleport: "&aTeleported to {PLAYER}"
+suspects-teleport-spectator: "&aTeleported to {PLAYER} in Spectator mode"
+suspects-player-offline: "&cPlayer is no longer online."
+
+punish-success: "&aExecuted max punishment on &f{PLAYER} &7(Action: {ACTION})"
+punish-no-action: "&cNo punishment actions configured."
+
+profile-header: "&e=== Profile: &f{PLAYER} &e==="
+profile-info: 
+  - "&7Sens: &f{SENS}%"
+  - "&7Client: &f{CLIENT}"
+  - "&7Detections (>0.8): &f{DETECTIONS}"

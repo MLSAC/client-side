@@ -104,9 +104,6 @@ penalties:
   # Minimum probability required for penalty execution (lowered for aggressiveness)
   min-probability: 0.50
   
-  # Prefix for custom alerts
-  custom-alert-prefix: "&6[MLSAC] &f"
-  
   # Ban animation settings
   # Epic animation: levitation + purple/pink particles + lightning strike
   animation:
@@ -117,62 +114,10 @@ penalties:
   # Actions by violation level
   # Aggressive system: alert -> kick -> ban
   actions:
-    1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
-    2: "{KICK} kick {PLAYER} MLSAC Detection (VL:{VL})"
-    3: "{BAN} ban {PLAYER} Cheating (MLSAC VL:{VL})"
+#    1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
+    1: "{KICK} kick {PLAYER} MLSAC Detection (VL:{VL})"
+    2: "{BAN} ban {PLAYER} Cheating (MLSAC VL:{VL})"
 
-# ┌───────────────────────────────────────────────────────────────────────────────┐
-# │                          MESSAGE SETTINGS                                     │
-# └───────────────────────────────────────────────────────────────────────────────┘
-#
-# Color codes:
-#   &0-&f - Standard Minecraft colors
-#   &#RRGGBB - Hex colors (1.16+)
-#
-# Formatting:
-#   &l - Bold, &o - Italic, &n - Underline, &m - Strikethrough, &r - Reset
-#
-
-messages:
-  prefix: "&6[MLSAC] &r"
-  
-  alerts-enabled: "&aAlerts enabled"
-  alerts-disabled: "&eAlerts disabled"
-  alert-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER}"
-  alert-format-vl: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &cVL: {VL}"
-  
-  unknown-command: "&cUnknown command: &f{ARGS}"
-  players-only: "&cThis command is for players only"
-  no-permission: "&cYou don't have permission"
-  player-not-found: "&cPlayer not found: &f{PLAYER}"
-  config-reloaded: "&aConfiguration reloaded!"
-  
-  tracking-stopped: "&eTracking stopped"
-  tracking-started: "&aTracking player &f{PLAYER}&a. Use &f/mlsac prob &aagain to stop"
-  prob-usage: "&eUsage: &f/mlsac prob <player>"
-  player-offline: "&cPlayer is offline"
-  
-  actionbar-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &eBuffer: &f{BUFFER} &7| &2VL: &f{VL}"
-  
-  data-status-header: "&e=== Data Collection Status ==="
-  active-sessions: "&fActive sessions: &e{COUNT}"
-  no-active-sessions: "&7No active data collection sessions"
-  start-hint: "&7Use &e/mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> &7to start"
-  session-started: "&aStarted &f{LABEL} &asession for &f{COUNT} &aplayer(s)"
-  session-stopped: "&eStopped session for &f{PLAYER}"
-  all-sessions-stopped: "&eStopped &f{COUNT} &esessions"
-  no-sessions-to-stop: "&7No active sessions to stop"
-  no-players-online: "&cNo players online"
-  invalid-label: "&cInvalid label: &f{LABEL}"
-  valid-labels: "&7Available labels: &aCHEAT, LEGIT, UNLABELED"
-  
-  usage-header: "&eUsage:"
-  usage-start: "&7  /mlsac start <NICK|GLOBAL> <CHEAT|LEGIT|UNLABELED> \"<comment>\""
-  usage-stop: "&7  /mlsac stop <NICK|GLOBAL>"
-  usage-alerts: "&7  /mlsac alerts - Toggle AI alerts"
-  usage-prob: "&7  /mlsac prob <player> - Track probability (actionbar)"
-  usage-datastatus: "&7  /mlsac datastatus - Data collection status"
-  usage-reload: "&7  /mlsac reload - Reload configuration"
 
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            FOLIA SETTINGS                                     │

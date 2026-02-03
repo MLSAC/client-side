@@ -21,13 +21,14 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.config;
+
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.*;
 import java.util.logging.Logger;
+
 public class Config {
     private final boolean debug;
     private final int preHitTicks;
@@ -47,10 +48,8 @@ public class Config {
     private final int aiStep;
     private final double aiPunishmentMinProbability;
     private final Map<Integer, String> punishmentCommands;
-    private final String customAlertPrefix;
     private final boolean animationEnabled;
-    private final String prefix;
-    private final Map<String, String> messages;
+
     private final boolean liteBansEnabled;
     private final String liteBansDbHost;
     private final int liteBansDbPort;
@@ -89,15 +88,10 @@ public class Config {
     public static final double DEFAULT_AI_BUFFER_MULTIPLIER = 100.0;
     public static final double DEFAULT_AI_BUFFER_DECREASE = 0.25;
     public static final double DEFAULT_AI_PUNISHMENT_MIN_PROBABILITY = 0.85;
-    public static final String DEFAULT_CUSTOM_ALERT_PREFIX = "&6[MLSAC] &f";
     public static final boolean DEFAULT_ANIMATION_ENABLED = true;
     public static final int DEFAULT_AI_SEQUENCE = 40;
     public static final int DEFAULT_AI_STEP = 10;
-    public static final String DEFAULT_PREFIX = "&6[MLSAC] &r";
-    public static final String DEFAULT_MSG_ALERTS_ENABLED = "&aAI alerts enabled";
-    public static final String DEFAULT_MSG_ALERTS_DISABLED = "&eAI alerts disabled";
-    public static final String DEFAULT_MSG_ALERT_FORMAT = "&c<player> &7flagged by AI &f| Prob: &e<probability> &f| Buffer: &e<buffer>";
-    public static final String DEFAULT_MSG_ALERT_FORMAT_VL = "&c<player> &7flagged by AI &f| Prob: &e<probability> &f| Buffer: &e<buffer> &f| VL: &c<vl>";
+
     public static final boolean DEFAULT_LITEBANS_ENABLED = false;
     public static final String DEFAULT_LITEBANS_DB_HOST = "localhost";
     public static final int DEFAULT_LITEBANS_DB_PORT = 3306;
@@ -120,6 +114,7 @@ public class Config {
     public static final int DEFAULT_FOLIA_THREAD_POOL_SIZE = 0;
     public static final boolean DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED = true;
     public static final boolean DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED = true;
+
     public Config() {
         this.debug = DEFAULT_DEBUG;
         this.preHitTicks = PRE_HIT_TICKS;
@@ -139,10 +134,8 @@ public class Config {
         this.aiStep = DEFAULT_AI_STEP;
         this.aiPunishmentMinProbability = DEFAULT_AI_PUNISHMENT_MIN_PROBABILITY;
         this.punishmentCommands = new HashMap<>();
-        this.customAlertPrefix = DEFAULT_CUSTOM_ALERT_PREFIX;
         this.animationEnabled = DEFAULT_ANIMATION_ENABLED;
-        this.prefix = DEFAULT_PREFIX;
-        this.messages = createDefaultMessages();
+
         this.liteBansEnabled = DEFAULT_LITEBANS_ENABLED;
         this.liteBansDbHost = DEFAULT_LITEBANS_DB_HOST;
         this.liteBansDbPort = DEFAULT_LITEBANS_DB_PORT;
@@ -167,6 +160,7 @@ public class Config {
         this.foliaEntitySchedulerEnabled = DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED;
         this.foliaRegionSchedulerEnabled = DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED;
     }
+
     private static Set<String> createDefaultCheatReasons() {
         Set<String> reasons = new HashSet<>();
         reasons.add("killaura");
@@ -174,17 +168,11 @@ public class Config {
         reasons.add("hack");
         return reasons;
     }
-    private static Map<String, String> createDefaultMessages() {
-        Map<String, String> defaults = new HashMap<>();
-        defaults.put("alerts-enabled", DEFAULT_MSG_ALERTS_ENABLED);
-        defaults.put("alerts-disabled", DEFAULT_MSG_ALERTS_DISABLED);
-        defaults.put("alert-format", DEFAULT_MSG_ALERT_FORMAT);
-        defaults.put("alert-format-vl", DEFAULT_MSG_ALERT_FORMAT_VL);
-        return defaults;
-    }
+
     public Config(JavaPlugin plugin) {
         this(plugin, null);
     }
+
     public Config(JavaPlugin plugin, Logger logger) {
         plugin.saveDefaultConfig();
         FileConfiguration config = plugin.getConfig();
@@ -194,31 +182,30 @@ public class Config {
         this.hitLockThreshold = HIT_LOCK_THRESHOLD;
         this.postHitTimeoutTicks = POST_HIT_TIMEOUT_TICKS;
         this.outputDirectory = config.getString("outputDirectory", DEFAULT_OUTPUT_DIRECTORY);
-        this.aiEnabled = config.getBoolean("detection.enabled", 
-            config.getBoolean("ai.enabled", DEFAULT_AI_ENABLED));
-        this.aiApiKey = config.getString("detection.api-key", 
-            config.getString("ai.api-key", DEFAULT_AI_API_KEY));
-        double alertThreshold = config.getDouble("alerts.threshold", 
-            config.getDouble("ai.alert.threshold", DEFAULT_AI_ALERT_THRESHOLD));
+        this.aiEnabled = config.getBoolean("detection.enabled",
+                config.getBoolean("ai.enabled", DEFAULT_AI_ENABLED));
+        this.aiApiKey = config.getString("detection.api-key",
+                config.getString("ai.api-key", DEFAULT_AI_API_KEY));
+        double alertThreshold = config.getDouble("alerts.threshold",
+                config.getDouble("ai.alert.threshold", DEFAULT_AI_ALERT_THRESHOLD));
         this.aiAlertThreshold = clampThreshold(alertThreshold, "alerts.threshold", logger);
-        this.aiConsoleAlerts = config.getBoolean("alerts.console", 
-            config.getBoolean("ai.alert.console", DEFAULT_AI_CONSOLE_ALERTS));
-        this.aiBufferFlag = config.getDouble("violation.threshold", 
-            config.getDouble("ai.buffer.flag", DEFAULT_AI_BUFFER_FLAG));
-        this.aiBufferResetOnFlag = config.getDouble("violation.reset-value", 
-            config.getDouble("ai.buffer.reset-on-flag", DEFAULT_AI_BUFFER_RESET_ON_FLAG));
-        this.aiBufferMultiplier = config.getDouble("violation.multiplier", 
-            config.getDouble("ai.buffer.multiplier", DEFAULT_AI_BUFFER_MULTIPLIER));
-        this.aiBufferDecrease = config.getDouble("violation.decay", 
-            config.getDouble("ai.buffer.decrease", DEFAULT_AI_BUFFER_DECREASE));
-        this.aiSequence = config.getInt("detection.sample-size", 
-            config.getInt("ai.sequence", DEFAULT_AI_SEQUENCE));
-        this.aiStep = config.getInt("detection.sample-interval", 
-            config.getInt("ai.step", DEFAULT_AI_STEP));
-        double punishmentMinProb = config.getDouble("penalties.min-probability", 
-            config.getDouble("ai.punishment.min-probability", DEFAULT_AI_PUNISHMENT_MIN_PROBABILITY));
+        this.aiConsoleAlerts = config.getBoolean("alerts.console",
+                config.getBoolean("ai.alert.console", DEFAULT_AI_CONSOLE_ALERTS));
+        this.aiBufferFlag = config.getDouble("violation.threshold",
+                config.getDouble("ai.buffer.flag", DEFAULT_AI_BUFFER_FLAG));
+        this.aiBufferResetOnFlag = config.getDouble("violation.reset-value",
+                config.getDouble("ai.buffer.reset-on-flag", DEFAULT_AI_BUFFER_RESET_ON_FLAG));
+        this.aiBufferMultiplier = config.getDouble("violation.multiplier",
+                config.getDouble("ai.buffer.multiplier", DEFAULT_AI_BUFFER_MULTIPLIER));
+        this.aiBufferDecrease = config.getDouble("violation.decay",
+                config.getDouble("ai.buffer.decrease", DEFAULT_AI_BUFFER_DECREASE));
+        this.aiSequence = config.getInt("detection.sample-size",
+                config.getInt("ai.sequence", DEFAULT_AI_SEQUENCE));
+        this.aiStep = config.getInt("detection.sample-interval",
+                config.getInt("ai.step", DEFAULT_AI_STEP));
+        double punishmentMinProb = config.getDouble("penalties.min-probability",
+                config.getDouble("ai.punishment.min-probability", DEFAULT_AI_PUNISHMENT_MIN_PROBABILITY));
         this.aiPunishmentMinProbability = clampThreshold(punishmentMinProb, "penalties.min-probability", logger);
-        this.customAlertPrefix = config.getString("penalties.custom-alert-prefix", DEFAULT_CUSTOM_ALERT_PREFIX);
         this.animationEnabled = config.getBoolean("penalties.animation.enabled", DEFAULT_ANIMATION_ENABLED);
         this.punishmentCommands = new HashMap<>();
         ConfigurationSection cmdSection = config.getConfigurationSection("penalties.actions");
@@ -233,22 +220,11 @@ public class Config {
                     if (cmd != null && !cmd.isEmpty()) {
                         punishmentCommands.put(vl, cmd);
                     }
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        this.prefix = config.getString("messages.prefix", DEFAULT_PREFIX);
-        this.messages = createDefaultMessages();
-        ConfigurationSection msgSection = config.getConfigurationSection("messages");
-        if (msgSection != null) {
-            for (String key : msgSection.getKeys(false)) {
-                if (!key.equals("prefix")) {
-                    String msg = msgSection.getString(key);
-                    if (msg != null) {
-                        messages.put(key, msg);
-                    }
+                } catch (NumberFormatException ignored) {
                 }
             }
         }
+
         this.liteBansEnabled = config.getBoolean("litebans.enabled", DEFAULT_LITEBANS_ENABLED);
         this.liteBansDbHost = config.getString("litebans.database.host", DEFAULT_LITEBANS_DB_HOST);
         this.liteBansDbPort = config.getInt("litebans.database.port", DEFAULT_LITEBANS_DB_PORT);
@@ -258,17 +234,19 @@ public class Config {
         this.liteBansTablePrefix = config.getString("litebans.table-prefix", DEFAULT_LITEBANS_TABLE_PREFIX);
         this.liteBansLookbackDays = config.getInt("litebans.lookback-days", DEFAULT_LITEBANS_LOOKBACK_DAYS);
         this.liteBansCheatReasons = new HashSet<>();
+
         List<String> reasonsList = config.getStringList("litebans.cheat-reasons");
         if (reasonsList.isEmpty()) {
             this.liteBansCheatReasons.addAll(createDefaultCheatReasons());
         } else {
             this.liteBansCheatReasons.addAll(reasonsList);
         }
+
         this.autostartEnabled = config.getBoolean("autostart.enabled", DEFAULT_AUTOSTART_ENABLED);
         this.autostartLabel = config.getString("autostart.label", DEFAULT_AUTOSTART_LABEL);
         this.autostartComment = config.getString("autostart.comment", DEFAULT_AUTOSTART_COMMENT);
-        this.serverAddress = config.getString("detection.endpoint", 
-            config.getString("ai.server", DEFAULT_SERVER_ADDRESS));
+        this.serverAddress = config.getString("detection.endpoint",
+                config.getString("ai.server", DEFAULT_SERVER_ADDRESS));
         this.reportStatsIntervalSeconds = DEFAULT_REPORT_STATS_INTERVAL_SECONDS;
         this.vlDecayEnabled = config.getBoolean("violation.vl-decay.enabled", DEFAULT_VL_DECAY_ENABLED);
         this.vlDecayIntervalSeconds = config.getInt("violation.vl-decay.interval", DEFAULT_VL_DECAY_INTERVAL_SECONDS);
@@ -277,88 +255,160 @@ public class Config {
         this.worldGuardDisabledRegions = config.getStringList("detection.worldguard.disabled-regions");
         this.foliaEnabled = config.getBoolean("folia.enabled", DEFAULT_FOLIA_ENABLED);
         this.foliaThreadPoolSize = config.getInt("folia.thread-pool-size", DEFAULT_FOLIA_THREAD_POOL_SIZE);
-        this.foliaEntitySchedulerEnabled = config.getBoolean("folia.entity-scheduler.enabled", DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED);
-        this.foliaRegionSchedulerEnabled = config.getBoolean("folia.region-scheduler.enabled", DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED);
+        this.foliaEntitySchedulerEnabled = config.getBoolean("folia.entity-scheduler.enabled",
+                DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED);
+        this.foliaRegionSchedulerEnabled = config.getBoolean("folia.region-scheduler.enabled",
+                DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED);
     }
+
     private double clampThreshold(double value, String configPath, Logger logger) {
         if (value < 0.0 || value > 1.0) {
             double clamped = Math.max(0.0, Math.min(1.0, value));
             if (logger != null) {
-                logger.warning("[Config] " + configPath + " value " + value + 
-                    " is outside valid range [0.0, 1.0], clamped to " + clamped);
+                logger.warning("[Config] " + configPath + " value " + value +
+                        " is outside valid range [0.0, 1.0], clamped to " + clamped);
             }
             return clamped;
         }
         return value;
     }
-    public boolean isDebug() { return debug; }
-    public int getPreHitTicks() { return preHitTicks; }
-    public int getPostHitTicks() { return postHitTicks; }
-    public double getHitLockThreshold() { return hitLockThreshold; }
-    public int getPostHitTimeoutTicks() { return postHitTimeoutTicks; }
-    public String getOutputDirectory() { return outputDirectory; }
-    public boolean isAiEnabled() { return aiEnabled; }
-    public String getAiApiKey() { return aiApiKey; }
-    public double getAiAlertThreshold() { return aiAlertThreshold; }
-    public boolean isAiConsoleAlerts() { return aiConsoleAlerts; }
-    public double getAiBufferFlag() { return aiBufferFlag; }
-    public double getAiBufferResetOnFlag() { return aiBufferResetOnFlag; }
-    public double getAiBufferMultiplier() { return aiBufferMultiplier; }
-    public double getAiBufferDecrease() { return aiBufferDecrease; }
-    public int getAiSequence() { return aiSequence; }
-    public int getAiStep() { return aiStep; }
-    public double getAiPunishmentMinProbability() { return aiPunishmentMinProbability; }
-    public String getCustomAlertPrefix() { return customAlertPrefix; }
-    public boolean isAnimationEnabled() { return animationEnabled; }
+
+    public boolean isDebug() {
+        return debug;
+    }
+
+    public int getPreHitTicks() {
+        return preHitTicks;
+    }
+
+    public int getPostHitTicks() {
+        return postHitTicks;
+    }
+
+    public double getHitLockThreshold() {
+        return hitLockThreshold;
+    }
+
+    public int getPostHitTimeoutTicks() {
+        return postHitTimeoutTicks;
+    }
+
+    public String getOutputDirectory() {
+        return outputDirectory;
+    }
+
+    public boolean isAiEnabled() {
+        return aiEnabled;
+    }
+
+    public String getAiApiKey() {
+        return aiApiKey;
+    }
+
+    public double getAiAlertThreshold() {
+        return aiAlertThreshold;
+    }
+
+    public boolean isAiConsoleAlerts() {
+        return aiConsoleAlerts;
+    }
+
+    public double getAiBufferFlag() {
+        return aiBufferFlag;
+    }
+
+    public double getAiBufferResetOnFlag() {
+        return aiBufferResetOnFlag;
+    }
+
+    public double getAiBufferMultiplier() {
+        return aiBufferMultiplier;
+    }
+
+    public double getAiBufferDecrease() {
+        return aiBufferDecrease;
+    }
+
+    public int getAiSequence() {
+        return aiSequence;
+    }
+
+    public int getAiStep() {
+        return aiStep;
+    }
+
+    public double getAiPunishmentMinProbability() {
+        return aiPunishmentMinProbability;
+    }
+
+    public boolean isAnimationEnabled() {
+        return animationEnabled;
+    }
+
     public String getPunishmentCommand(int vl) {
         return punishmentCommands.get(vl);
     }
+
     public Map<Integer, String> getPunishmentCommands() {
         return punishmentCommands;
     }
-    public String getPrefix() {
-        return prefix;
+
+    public boolean isLiteBansEnabled() {
+        return liteBansEnabled;
     }
-    public String getMessage(String key) {
-        return messages.getOrDefault(key, "");
+
+    public String getLiteBansDbHost() {
+        return liteBansDbHost;
     }
-    public String getMessage(String key, String player, double probability, double buffer, int vl) {
-        String msg = getMessage(key);
-        String playerValue = player != null ? player : "";
-        String probValue = String.format("%.2f", probability);
-        String bufferValue = String.format("%.1f", buffer);
-        String vlValue = String.valueOf(vl);
-        return msg
-            .replace("{PLAYER}", playerValue)
-            .replace("{PROBABILITY}", probValue)
-            .replace("{BUFFER}", bufferValue)
-            .replace("{VL}", vlValue)
-            .replace("<player>", playerValue)
-            .replace("<probability>", probValue)
-            .replace("<buffer>", bufferValue)
-            .replace("<vl>", vlValue);
+
+    public int getLiteBansDbPort() {
+        return liteBansDbPort;
     }
-    public String getMessage(String key, String... replacements) {
-        String msg = getMessage(key);
-        for (int i = 0; i < replacements.length - 1; i += 2) {
-            msg = msg.replace(replacements[i], replacements[i + 1]);
-        }
-        return msg;
+
+    public String getLiteBansDbName() {
+        return liteBansDbName;
     }
-    public boolean isLiteBansEnabled() { return liteBansEnabled; }
-    public String getLiteBansDbHost() { return liteBansDbHost; }
-    public int getLiteBansDbPort() { return liteBansDbPort; }
-    public String getLiteBansDbName() { return liteBansDbName; }
-    public String getLiteBansDbUsername() { return liteBansDbUsername; }
-    public String getLiteBansDbPassword() { return liteBansDbPassword; }
-    public String getLiteBansTablePrefix() { return liteBansTablePrefix; }
-    public int getLiteBansLookbackDays() { return liteBansLookbackDays; }
-    public Set<String> getLiteBansCheatReasons() { return liteBansCheatReasons; }
-    public boolean isAutostartEnabled() { return autostartEnabled; }
-    public String getAutostartLabel() { return autostartLabel; }
-    public String getAutostartComment() { return autostartComment; }
-    public String getServerAddress() { return serverAddress; }
-    public int getReportStatsIntervalSeconds() { return reportStatsIntervalSeconds; }
+
+    public String getLiteBansDbUsername() {
+        return liteBansDbUsername;
+    }
+
+    public String getLiteBansDbPassword() {
+        return liteBansDbPassword;
+    }
+
+    public String getLiteBansTablePrefix() {
+        return liteBansTablePrefix;
+    }
+
+    public int getLiteBansLookbackDays() {
+        return liteBansLookbackDays;
+    }
+
+    public Set<String> getLiteBansCheatReasons() {
+        return liteBansCheatReasons;
+    }
+
+    public boolean isAutostartEnabled() {
+        return autostartEnabled;
+    }
+
+    public String getAutostartLabel() {
+        return autostartLabel;
+    }
+
+    public String getAutostartComment() {
+        return autostartComment;
+    }
+
+    public String getServerAddress() {
+        return serverAddress;
+    }
+
+    public int getReportStatsIntervalSeconds() {
+        return reportStatsIntervalSeconds;
+    }
+
     public String getServerHost() {
         int colonIndex = serverAddress.lastIndexOf(':');
         if (colonIndex > 0) {
@@ -366,6 +416,7 @@ public class Config {
         }
         return serverAddress;
     }
+
     public int getServerPort() {
         int colonIndex = serverAddress.lastIndexOf(':');
         if (colonIndex > 0 && colonIndex < serverAddress.length() - 1) {
@@ -377,13 +428,40 @@ public class Config {
         }
         return 5000;
     }
-    public boolean isVlDecayEnabled() { return vlDecayEnabled; }
-    public int getVlDecayIntervalSeconds() { return vlDecayIntervalSeconds; }
-    public int getVlDecayAmount() { return vlDecayAmount; }
-    public boolean isWorldGuardEnabled() { return worldGuardEnabled; }
-    public List<String> getWorldGuardDisabledRegions() { return worldGuardDisabledRegions; }
-    public boolean isFoliaEnabled() { return foliaEnabled; }
-    public int getFoliaThreadPoolSize() { return foliaThreadPoolSize; }
-    public boolean isFoliaEntitySchedulerEnabled() { return foliaEntitySchedulerEnabled; }
-    public boolean isFoliaRegionSchedulerEnabled() { return foliaRegionSchedulerEnabled; }
+
+    public boolean isVlDecayEnabled() {
+        return vlDecayEnabled;
+    }
+
+    public int getVlDecayIntervalSeconds() {
+        return vlDecayIntervalSeconds;
+    }
+
+    public int getVlDecayAmount() {
+        return vlDecayAmount;
+    }
+
+    public boolean isWorldGuardEnabled() {
+        return worldGuardEnabled;
+    }
+
+    public List<String> getWorldGuardDisabledRegions() {
+        return worldGuardDisabledRegions;
+    }
+
+    public boolean isFoliaEnabled() {
+        return foliaEnabled;
+    }
+
+    public int getFoliaThreadPoolSize() {
+        return foliaThreadPoolSize;
+    }
+
+    public boolean isFoliaEntitySchedulerEnabled() {
+        return foliaEntitySchedulerEnabled;
+    }
+
+    public boolean isFoliaRegionSchedulerEnabled() {
+        return foliaRegionSchedulerEnabled;
+    }
 }

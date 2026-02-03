@@ -1,0 +1,27 @@
+# Configuration for Suspects GUI
+gui:
+  title: "&cMLSAC &8> &7Suspects"
+  size: 54
+  items:
+    suspect_head:
+      name: "&c{PLAYER}"
+      lore:
+        - "&8&m------------------------"
+        - "&7AVG Probability: {AVG_PROB}"
+        - "&7History (Last {HISTORY_SIZE}):"
+        - "{HISTORY}"
+        - "&8&m------------------------"
+        - "&eLeft-Click to Teleport"
+        - "&eRight-Click to TP + GM3"
+    previous_page:
+      material: ARROW
+      name: "&ePrevious Page (&f{PAGE}&e)"
+    next_page:
+      material: ARROW
+      name: "&eNext Page (&f{PAGE}&e)"
+    page_info:
+      material: PAPER
+      name: "&bPage &f{CURRENT} &7/ &f{TOTAL}"
+    filler:
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "

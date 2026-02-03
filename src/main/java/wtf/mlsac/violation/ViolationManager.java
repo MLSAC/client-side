@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.violation;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import wtf.mlsac.Main;
@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+
 public class ViolationManager {
     private static final int MAX_KICK_HISTORY = 10;
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -59,6 +60,7 @@ public class ViolationManager {
     private Config config;
     private AICheck aiCheck;
     private ScheduledTask decayTask;
+
     public static class KickRecord {
         private final String playerName;
         private final double probability;
@@ -66,6 +68,7 @@ public class ViolationManager {
         private final int vl;
         private final LocalDateTime time;
         private final String command;
+
         public KickRecord(String playerName, double probability, double buffer, int vl, String command) {
             this.playerName = playerName;
             this.probability = probability;
@@ -74,16 +77,36 @@ public class ViolationManager {
             this.time = LocalDateTime.now();
             this.command = command;
         }
-        public String getPlayerName() { return playerName; }
-        public double getProbability() { return probability; }
-        public double getBuffer() { return buffer; }
-        public int getVl() { return vl; }
-        public LocalDateTime getTime() { return time; }
-        public String getCommand() { return command; }
+
+        public String getPlayerName() {
+            return playerName;
+        }
+
+        public double getProbability() {
+            return probability;
+        }
+
+        public double getBuffer() {
+            return buffer;
+        }
+
+        public int getVl() {
+            return vl;
+        }
+
+        public LocalDateTime getTime() {
+            return time;
+        }
+
+        public String getCommand() {
+            return command;
+        }
+
         public String getFormattedTime() {
             return time.format(TIME_FORMATTER);
         }
     }
+
     public ViolationManager(Main plugin, Config config, AlertManager alertManager) {
         this.plugin = plugin;
         this.config = config;
@@ -96,9 +119,11 @@ public class ViolationManager {
         updatePenaltyExecutorConfig();
         startDecayTask();
     }
+
     public void setAICheck(AICheck aiCheck) {
         this.aiCheck = aiCheck;
     }
+
     private void startDecayTask() {
         stopDecayTask();
         if (!config.isVlDecayEnabled()) {
@@ -108,12 +133,14 @@ public class ViolationManager {
         decayTask = SchedulerManager.getAdapter().runSyncRepeating(this::processDecay, intervalTicks, intervalTicks);
         plugin.debug("[VL] Decay task started with interval " + config.getVlDecayIntervalSeconds() + "s");
     }
+
     private void stopDecayTask() {
         if (decayTask != null) {
             decayTask.cancel();
             decayTask = null;
         }
     }
+
     private void processDecay() {
         if (aiCheck == null) {
             return;
@@ -136,16 +163,19 @@ public class ViolationManager {
             }
         }
     }
+
     private void updatePenaltyExecutorConfig() {
-        penaltyExecutor.setAlertPrefix(config.getCustomAlertPrefix());
+        penaltyExecutor.setAlertPrefix(plugin.getMessagesConfig().getPrefix());
         penaltyExecutor.setConsoleAlerts(config.isAiConsoleAlerts());
         penaltyExecutor.setAnimationEnabled(config.isAnimationEnabled());
     }
+
     public void setConfig(Config config) {
         this.config = config;
         updatePenaltyExecutorConfig();
         startDecayTask();
     }
+
     public void handleFlag(Player player, double probability, double buffer) {
         if (probability < config.getAiPunishmentMinProbability()) {
             return;
@@ -154,9 +184,9 @@ public class ViolationManager {
         long now = System.currentTimeMillis();
         int newVl = incrementViolationLevel(uuid);
         alertManager.sendAlert(player.getName(), probability, buffer, newVl);
-        plugin.debug("[AI] " + player.getName() + " flagged - VL: " + newVl + 
-                   ", Prob: " + String.format("%.2f", probability) + 
-                   ", Buffer: " + String.format("%.1f", buffer));
+        plugin.debug("[AI] " + player.getName() + " flagged - VL: " + newVl +
+                ", Prob: " + String.format("%.2f", probability) +
+                ", Buffer: " + String.format("%.1f", buffer));
         String command = getApplicablePunishmentCommand(newVl);
         if (command != null) {
             ActionType actionType = ActionType.fromCommand(command);
@@ -171,15 +201,19 @@ public class ViolationManager {
             executeCommand(command, player, probability, buffer, newVl);
         }
     }
+
     public int incrementViolationLevel(UUID playerId) {
         return violationLevels.merge(playerId, 1, Integer::sum);
     }
+
     public int getViolationLevel(UUID playerId) {
         return violationLevels.getOrDefault(playerId, 0);
     }
+
     public void resetViolationLevel(UUID playerId) {
         violationLevels.remove(playerId);
     }
+
     public String getApplicablePunishmentCommand(int vl) {
         Map<Integer, String> commands = config.getPunishmentCommands();
         if (commands.isEmpty()) {
@@ -203,37 +237,69 @@ public class ViolationManager {
         }
         return applicableThreshold > 0 ? commands.get(applicableThreshold) : null;
     }
+
+    public void executeMaxPunishment(Player player) {
+        Map<Integer, String> commands = config.getPunishmentCommands();
+        if (commands.isEmpty()) {
+            return;
+        }
+
+        int maxThreshold = -1;
+        for (int threshold : commands.keySet()) {
+            if (threshold > maxThreshold) {
+                maxThreshold = threshold;
+            }
+        }
+
+        if (maxThreshold != -1) {
+            String command = commands.get(maxThreshold);
+            // Use current VL or max VL? The context suggests punishing them immediately.
+            // Using a dummy high VL/prob/buffer for the context log if needed, or fetching
+            // current.
+            // But ActionType usually uses {VL} placeholder.
+            // I'll use the maxThreshold as the VL for the context to ensure it looks like a
+            // max punishment.
+            executeCommand(command, player, 1.0, 100.0, maxThreshold);
+        }
+    }
+
     public void executeCommand(String command, Player player, double probability, double buffer, int vl) {
         PenaltyContext context = PenaltyContext.builder()
-            .playerName(player.getName())
-            .violationLevel(vl)
-            .probability(probability)
-            .buffer(buffer)
-            .build();
+                .playerName(player.getName())
+                .violationLevel(vl)
+                .probability(probability)
+                .buffer(buffer)
+                .build();
         addKickRecord(new KickRecord(player.getName(), probability, buffer, vl, command));
         penaltyExecutor.execute(command, context);
     }
+
     private synchronized void addKickRecord(KickRecord record) {
         kickHistory.addFirst(record);
         while (kickHistory.size() > MAX_KICK_HISTORY) {
             kickHistory.removeLast();
         }
     }
+
     public synchronized List<KickRecord> getKickHistory() {
         return Collections.unmodifiableList(new ArrayList<>(kickHistory));
     }
+
     public PenaltyExecutor getPenaltyExecutor() {
         return penaltyExecutor;
     }
+
     public void handlePlayerQuit(Player player) {
         lastPunishmentTime.remove(player.getUniqueId());
     }
+
     public void decreaseViolationLevel(UUID playerId, int amount) {
         violationLevels.computeIfPresent(playerId, (k, v) -> {
             int newVl = v - amount;
             return newVl <= 0 ? null : newVl;
         });
     }
+
     public void clearAll() {
         violationLevels.clear();
         lastPunishmentTime.clear();
@@ -241,6 +307,7 @@ public class ViolationManager {
             kickHistory.clear();
         }
     }
+
     public void shutdown() {
         stopDecayTask();
         clearAll();

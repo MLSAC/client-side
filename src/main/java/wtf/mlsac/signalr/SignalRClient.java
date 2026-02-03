@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr;
+
 import org.bukkit.plugin.java.JavaPlugin;
 import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIResponse;
@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 public class SignalRClient implements IAIClient {
     private static final int SHUTDOWN_TIMEOUT_SECONDS = 5;
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -56,8 +57,9 @@ public class SignalRClient implements IAIClient {
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final AtomicInteger autoReconnectAttempts = new AtomicInteger(0);
     private volatile CompletableFuture<Boolean> connectionFuture = null;
+
     public SignalRClient(JavaPlugin plugin, String serverAddress, String apiKey,
-                         int reportStatsIntervalSeconds, IntSupplier onlinePlayersSupplier, boolean debug) {
+            int reportStatsIntervalSeconds, IntSupplier onlinePlayersSupplier, boolean debug) {
         this.plugin = plugin;
         this.serverAddress = serverAddress;
         this.apiKey = apiKey;
@@ -66,6 +68,7 @@ public class SignalRClient implements IAIClient {
         this.onlinePlayersSupplier = onlinePlayersSupplier;
         this.debug = debug;
     }
+
     public synchronized CompletableFuture<Boolean> connect() {
         if (connectionFuture != null && !connectionFuture.isDone()) {
             return connectionFuture;
@@ -76,7 +79,7 @@ public class SignalRClient implements IAIClient {
                 if (pluginHash == null || pluginHash.isEmpty()) {
                     this.pluginHash = PluginHashCalculator.calculatePluginHash(plugin);
                 }
-                
+
                 if (pluginHash.isEmpty()) {
                     logger.warning("[SignalR] Plugin hash calculation failed, using empty hash");
                 }
@@ -108,21 +111,21 @@ public class SignalRClient implements IAIClient {
 
                 if (this.reportStatsScheduler == null) {
                     this.reportStatsScheduler = new SignalRReportStatsScheduler(
-                        plugin, sessionManager, onlinePlayersSupplier);
-                    reportStatsScheduler.setOnLimitExceededCallback(() -> 
-                        logger.warning("[SignalR] Online limit exceeded - Predict blocked"));
-                    reportStatsScheduler.setOnLimitClearedCallback(() -> 
-                        logger.info("[SignalR] Online limit cleared - Predict enabled"));
+                            plugin, sessionManager, onlinePlayersSupplier);
+                    reportStatsScheduler.setOnLimitExceededCallback(
+                            () -> logger.warning("[SignalR] Online limit exceeded - Predict blocked"));
+                    reportStatsScheduler.setOnLimitClearedCallback(
+                            () -> logger.info("[SignalR] Online limit cleared - Predict enabled"));
                     reportStatsScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
                 }
-                
+
                 reportStatsScheduler.start(reportStatsIntervalSeconds);
 
                 if (this.heartbeatScheduler == null) {
                     this.heartbeatScheduler = new SignalRHeartbeatScheduler(plugin, sessionManager);
                     heartbeatScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
                 }
-                
+
                 heartbeatScheduler.start();
 
                 connected = true;
@@ -140,12 +143,14 @@ public class SignalRClient implements IAIClient {
                 return false;
             }
         });
-        
+
         return connectionFuture;
     }
+
     public CompletableFuture<Boolean> connectWithRetry() {
         return connectWithRetry(0);
     }
+
     private CompletableFuture<Boolean> connectWithRetry(int attempt) {
         if (attempt >= MAX_RETRY_ATTEMPTS) {
             logger.severe("[SignalR] Max retry attempts reached, giving up");
@@ -156,8 +161,8 @@ public class SignalRClient implements IAIClient {
                 return CompletableFuture.completedFuture(true);
             }
             long backoffMs = calculateBackoff(attempt);
-            logger.info("[SignalR] Retrying connection in " + backoffMs + "ms (attempt " + 
-                (attempt + 1) + "/" + MAX_RETRY_ATTEMPTS + ")");
+            logger.info("[SignalR] Retrying connection in " + backoffMs + "ms (attempt " +
+                    (attempt + 1) + "/" + MAX_RETRY_ATTEMPTS + ")");
             CompletableFuture<Boolean> future = new CompletableFuture<>();
             SchedulerManager.getAdapter().runAsyncDelayed(() -> {
                 connectWithRetry(attempt + 1).thenAccept(future::complete);
@@ -165,9 +170,11 @@ public class SignalRClient implements IAIClient {
             return future;
         });
     }
+
     public static long calculateBackoff(int attempt) {
         return INITIAL_BACKOFF_MS * (1L << attempt);
     }
+
     public CompletableFuture<Void> disconnect() {
         shuttingDown = true;
         autoReconnectEnabled = false;
@@ -181,8 +188,8 @@ public class SignalRClient implements IAIClient {
                 }
                 if (sessionManager != null) {
                     try {
-                        sessionManager.closeSession().get(SHUTDOWN_TIMEOUT_SECONDS, 
-                            java.util.concurrent.TimeUnit.SECONDS);
+                        sessionManager.closeSession().get(SHUTDOWN_TIMEOUT_SECONDS,
+                                java.util.concurrent.TimeUnit.SECONDS);
                     } catch (Exception e) {
                         logger.warning("[SignalR] Error closing session: " + e.getMessage());
                     }
@@ -194,6 +201,7 @@ public class SignalRClient implements IAIClient {
             }
         });
     }
+
     private void handleDisconnection(Throwable exception) {
         connected = false;
         if (shuttingDown || !autoReconnectEnabled) {
@@ -212,6 +220,7 @@ public class SignalRClient implements IAIClient {
         }
         scheduleReconnect();
     }
+
     private void handleSessionExpired() {
         if (shuttingDown || !autoReconnectEnabled) {
             return;
@@ -232,16 +241,18 @@ public class SignalRClient implements IAIClient {
             }
         });
     }
+
     private void scheduleReconnect() {
         int attempt = autoReconnectAttempts.incrementAndGet();
         long delayMs = RECONNECT_INTERVAL_MS;
         long delaySeconds = delayMs / 1000;
-        
+
         logger.info("[SignalR] Scheduling reconnect attempt " + attempt + " in " + delaySeconds + " seconds...");
-        
+
         long delayTicks = delayMs / 50;
         SchedulerManager.getAdapter().runAsyncDelayed(this::attemptReconnect, delayTicks);
     }
+
     private void attemptReconnect() {
         if (shuttingDown || !autoReconnectEnabled) {
             return;
@@ -267,15 +278,19 @@ public class SignalRClient implements IAIClient {
             return null;
         });
     }
+
     private long calculateReconnectDelay(int attempt) {
         return RECONNECT_INTERVAL_MS;
     }
+
     public void setAutoReconnectEnabled(boolean enabled) {
         this.autoReconnectEnabled = enabled;
     }
+
     public boolean isAutoReconnectEnabled() {
         return autoReconnectEnabled;
     }
+
     public CompletableFuture<Boolean> reconnect() {
         autoReconnectAttempts.set(0);
         return disconnect().thenCompose(v -> {
@@ -284,94 +299,102 @@ public class SignalRClient implements IAIClient {
             return connect();
         });
     }
+
     public CompletableFuture<AIResponse> predict(byte[] playerData, String playerUuid) {
         if (!isConnected()) {
             return CompletableFuture.failedFuture(
-                new IllegalStateException("Not connected to SignalR server"));
+                    new IllegalStateException("Not connected to SignalR server"));
         }
         if (reportStatsScheduler != null && reportStatsScheduler.isLimitExceeded()) {
             return CompletableFuture.failedFuture(
-                new IllegalStateException("Online limit exceeded, Predict blocked"));
+                    new IllegalStateException("Online limit exceeded, Predict blocked"));
         }
         return sessionManager.predict(playerData, playerUuid)
-            .thenCompose(result -> {
-                if (result.isSuccess()) {
-                    return CompletableFuture.completedFuture(
-                        new AIResponse(result.getProbability()));
-                }
-                String errorCode = result.getErrorCode();
-                if (HubErrorParser.requiresReportStats(errorCode)) {
-                    logger.warning("[SignalR] Predict failed: " + errorCode + ", calling ReportStats...");
-                    return handleStatsRequiredAndRetry(playerData, playerUuid);
-                }
-                if (HubErrorParser.LIMIT_EXCEEDED.equals(errorCode)) {
-                    logger.warning("[SignalR] Predict failed: Online limit exceeded");
-                    if (reportStatsScheduler != null) {
-                        reportStatsScheduler.setLimitExceeded(true);
+                .thenCompose(result -> {
+                    if (result.isSuccess()) {
+                        return CompletableFuture.completedFuture(
+                                new AIResponse(result.getProbability()));
+                    }
+                    String errorCode = result.getErrorCode();
+                    if (HubErrorParser.requiresReportStats(errorCode)) {
+                        logger.warning("[SignalR] Predict failed: " + errorCode + ", calling ReportStats...");
+                        return handleStatsRequiredAndRetry(playerData, playerUuid);
+                    }
+                    if (HubErrorParser.LIMIT_EXCEEDED.equals(errorCode)) {
+                        logger.warning("[SignalR] Predict failed: Online limit exceeded");
+                        if (reportStatsScheduler != null) {
+                            reportStatsScheduler.setLimitExceeded(true);
+                        }
+                        return CompletableFuture.failedFuture(
+                                new RuntimeException("Online limit exceeded"));
+                    }
+                    if (HubErrorParser.NOT_AUTHENTICATED.equals(errorCode)) {
+                        logger.warning("[SignalR] Session expired during prediction, attempting reconnect");
+                        return handleUnauthenticatedAndRetry(playerData, playerUuid);
                     }
                     return CompletableFuture.failedFuture(
-                        new RuntimeException("Online limit exceeded"));
-                }
-                if (HubErrorParser.NOT_AUTHENTICATED.equals(errorCode)) {
-                    logger.warning("[SignalR] Session expired during prediction, attempting reconnect");
-                    return handleUnauthenticatedAndRetry(playerData, playerUuid);
-                }
-                return CompletableFuture.failedFuture(
-                    new RuntimeException(errorCode + ": " + result.getErrorMessage()));
-            });
+                            new RuntimeException(errorCode + ": " + result.getErrorMessage()));
+                });
     }
+
     private CompletableFuture<AIResponse> handleStatsRequiredAndRetry(byte[] playerData, String playerUuid) {
         if (reportStatsScheduler == null) {
             return CompletableFuture.failedFuture(
-                new RuntimeException("ReportStats scheduler not initialized"));
+                    new RuntimeException("ReportStats scheduler not initialized"));
         }
         return reportStatsScheduler.reportNow()
-            .thenCompose(statsResult -> {
-                if (!statsResult.isSuccess()) {
-                    return CompletableFuture.failedFuture(
-                        new RuntimeException("ReportStats failed: " + statsResult.getError()));
-                }
-                if (statsResult.isLimitExceeded()) {
-                    return CompletableFuture.failedFuture(
-                        new RuntimeException("Online limit exceeded after ReportStats"));
-                }
-                return sessionManager.predict(playerData, playerUuid)
-                    .thenApply(result -> {
-                        if (result.isSuccess()) {
-                            return new AIResponse(result.getProbability());
-                        }
-                        throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
-                    });
-            });
+                .thenCompose(statsResult -> {
+                    if (!statsResult.isSuccess()) {
+                        return CompletableFuture.failedFuture(
+                                new RuntimeException("ReportStats failed: " + statsResult.getError()));
+                    }
+                    if (statsResult.isLimitExceeded()) {
+                        return CompletableFuture.failedFuture(
+                                new RuntimeException("Online limit exceeded after ReportStats"));
+                    }
+                    return sessionManager.predict(playerData, playerUuid)
+                            .thenApply(result -> {
+                                if (result.isSuccess()) {
+                                    return new AIResponse(result.getProbability());
+                                }
+                                throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
+                            });
+                });
     }
+
     private CompletableFuture<AIResponse> handleUnauthenticatedAndRetry(byte[] playerData, String playerUuid) {
         return sessionManager.createSession(apiKey, pluginHash)
-            .thenCompose(sessionId -> {
-                return sessionManager.predict(playerData, playerUuid)
-                    .thenApply(result -> {
-                        if (result.isSuccess()) {
-                            return new AIResponse(result.getProbability());
-                        }
-                        throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
-                    });
-            });
+                .thenCompose(sessionId -> {
+                    return sessionManager.predict(playerData, playerUuid)
+                            .thenApply(result -> {
+                                if (result.isSuccess()) {
+                                    return new AIResponse(result.getProbability());
+                                }
+                                throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
+                            });
+                });
     }
+
     @Override
     public boolean isConnected() {
         return connected && sessionManager != null && sessionManager.isSessionValid();
     }
+
     @Override
     public boolean isLimitExceeded() {
         return reportStatsScheduler != null && reportStatsScheduler.isLimitExceeded();
     }
+
     @Override
     public String getSessionId() {
         return sessionManager != null ? sessionManager.getSessionId() : null;
     }
+
     @Override
     public String getServerAddress() {
         return serverAddress;
     }
+
     public SignalREndpointConfig getEndpointConfig() {
         return endpointConfig;
     }

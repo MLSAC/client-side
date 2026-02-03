@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.data;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -31,31 +31,44 @@ import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import wtf.mlsac.util.AimProcessor;
 import wtf.mlsac.util.BufferCalculator;
+
 public class AIPlayerData {
     private final UUID playerId;
     private final AimProcessor aimProcessor;
     private final Deque<TickData> tickBuffer;
+    private final Deque<Double> probabilityHistory;
     private final int sequence;
     private int ticksSinceAttack;
     private int ticksStep;
     private volatile double buffer;
     private volatile double lastProbability;
     private volatile boolean pendingRequest;
+    private volatile boolean isBedrock;
+    private volatile int highProbabilityDetections;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
     public AIPlayerData(UUID playerId) {
         this(playerId, 40);
     }
+
     public AIPlayerData(UUID playerId, int sequence) {
         this.playerId = playerId;
         this.sequence = sequence;
         this.aimProcessor = new AimProcessor();
         this.tickBuffer = new ArrayDeque<>(sequence);
+        this.probabilityHistory = new ArrayDeque<>(10);
         this.ticksSinceAttack = sequence + 1;
         this.ticksStep = 0;
         this.buffer = 0.0;
         this.lastProbability = 0.0;
         this.pendingRequest = false;
+        this.buffer = 0.0;
+        this.lastProbability = 0.0;
+        this.pendingRequest = false;
+        this.isBedrock = false;
+        this.highProbabilityDetections = 0;
     }
+
     public TickData processTick(float yaw, float pitch) {
         TickData tickData = aimProcessor.process(yaw, pitch);
         lock.writeLock().lock();
@@ -69,6 +82,7 @@ public class AIPlayerData {
         }
         return tickData;
     }
+
     public void onAttack() {
         lock.writeLock().lock();
         try {
@@ -77,6 +91,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public void onTeleport() {
         lock.writeLock().lock();
         try {
@@ -86,6 +101,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public void incrementTicksSinceAttack() {
         lock.writeLock().lock();
         try {
@@ -96,6 +112,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public void incrementStepCounter() {
         lock.writeLock().lock();
         try {
@@ -104,6 +121,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     @Deprecated
     public void onTick() {
         lock.writeLock().lock();
@@ -117,6 +135,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public boolean shouldSendData(int step, int sequence) {
         lock.readLock().lock();
         try {
@@ -125,6 +144,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public void setPendingRequest(boolean pending) {
         lock.writeLock().lock();
         try {
@@ -133,6 +153,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public boolean isPendingRequest() {
         lock.readLock().lock();
         try {
@@ -141,6 +162,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     @Deprecated
     public boolean shouldSendData(int step) {
         lock.readLock().lock();
@@ -150,6 +172,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public void resetStepCounter() {
         lock.writeLock().lock();
         try {
@@ -158,6 +181,7 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public List<TickData> getTickBuffer() {
         lock.readLock().lock();
         try {
@@ -166,6 +190,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public void clearBuffer() {
         lock.writeLock().lock();
         try {
@@ -174,16 +199,19 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
+
     public void fullReset() {
         lock.writeLock().lock();
         try {
             tickBuffer.clear();
+            probabilityHistory.clear();
             aimProcessor.reset();
             pendingRequest = false;
         } finally {
             lock.writeLock().unlock();
         }
     }
+
     public boolean isInCombat() {
         lock.readLock().lock();
         try {
@@ -192,6 +220,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public int getBufferSize() {
         lock.readLock().lock();
         try {
@@ -200,9 +229,11 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public int getSequence() {
         return sequence;
     }
+
     public int getTicksSinceAttack() {
         lock.readLock().lock();
         try {
@@ -211,15 +242,24 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public void updateBuffer(double probability, double multiplier, double decreaseAmount, double threshold) {
         lock.writeLock().lock();
         try {
             this.lastProbability = probability;
+            if (probabilityHistory.size() >= 10) {
+                probabilityHistory.pollFirst();
+            }
+            probabilityHistory.addLast(probability);
+            if (probability > 0.8) {
+                this.highProbabilityDetections++;
+            }
             this.buffer = BufferCalculator.updateBuffer(buffer, probability, multiplier, decreaseAmount, threshold);
         } finally {
             lock.writeLock().unlock();
         }
     }
+
     public boolean shouldFlag(double flagThreshold) {
         lock.readLock().lock();
         try {
@@ -228,6 +268,7 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
+
     public void resetBuffer(double resetValue) {
         lock.writeLock().lock();
         try {
@@ -236,7 +277,11 @@ public class AIPlayerData {
             lock.writeLock().unlock();
         }
     }
-    public UUID getPlayerId() { return playerId; }
+
+    public UUID getPlayerId() {
+        return playerId;
+    }
+
     public double getBuffer() {
         lock.readLock().lock();
         try {
@@ -245,6 +290,45 @@ public class AIPlayerData {
             lock.readLock().unlock();
         }
     }
-    public double getLastProbability() { return lastProbability; }
-    public AimProcessor getAimProcessor() { return aimProcessor; }
+
+    public double getLastProbability() {
+        return lastProbability;
+    }
+
+    public List<Double> getProbabilityHistory() {
+        lock.readLock().lock();
+        try {
+            return new ArrayList<>(probabilityHistory);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public double getAverageProbability() {
+        lock.readLock().lock();
+        try {
+            if (probabilityHistory.isEmpty()) {
+                return 0.0;
+            }
+            return probabilityHistory.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public AimProcessor getAimProcessor() {
+        return aimProcessor;
+    }
+
+    public boolean isBedrock() {
+        return isBedrock;
+    }
+
+    public void setBedrock(boolean bedrock) {
+        this.isBedrock = bedrock;
+    }
+
+    public int getHighProbabilityDetections() {
+        return highProbabilityDetections;
+    }
 }

@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.checks;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -39,11 +39,13 @@ import wtf.mlsac.server.AIResponse;
 import wtf.mlsac.server.FlatBufferSerializer;
 import wtf.mlsac.server.IAIClient;
 import wtf.mlsac.violation.ViolationManager;
+import wtf.mlsac.util.GeyserUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+
 public class AICheck {
     private final Main plugin;
     private final AIClientProvider clientProvider;
@@ -56,9 +58,10 @@ public class AICheck {
     private WorldGuardCompat worldGuardCompat;
     private int sequence;
     private int step;
+
     public AICheck(Main plugin, Config config,
-                   AIClientProvider clientProvider,
-                   AlertManager alertManager, ViolationManager violationManager) {
+            AIClientProvider clientProvider,
+            AlertManager alertManager, ViolationManager violationManager) {
         this.plugin = plugin;
         this.config = config;
         this.clientProvider = clientProvider;
@@ -70,21 +73,21 @@ public class AICheck {
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
         this.worldGuardCompat = new WorldGuardCompat(
-            plugin.getLogger(),
-            config.isWorldGuardEnabled(),
-            config.getWorldGuardDisabledRegions()
-        );
+                plugin.getLogger(),
+                config.isWorldGuardEnabled(),
+                config.getWorldGuardDisabledRegions());
     }
+
     public void setConfig(Config config) {
         this.config = config;
         this.sequence = config.getAiSequence();
         this.step = config.getAiStep();
         this.worldGuardCompat = new WorldGuardCompat(
-            plugin.getLogger(),
-            config.isWorldGuardEnabled(),
-            config.getWorldGuardDisabledRegions()
-        );
+                plugin.getLogger(),
+                config.isWorldGuardEnabled(),
+                config.getWorldGuardDisabledRegions());
     }
+
     public void onAttack(Player player, Entity target) {
         if (!config.isAiEnabled()) {
             return;
@@ -99,18 +102,26 @@ public class AICheck {
         if (!player.isValid()) {
             return;
         }
+        if (!player.isValid()) {
+            return;
+        }
         schedulerAdapter.runEntitySync(player, () -> {
             AIPlayerData data = getOrCreatePlayerData(player);
+            if (data.isBedrock()) {
+                plugin.debug("[AI] Skipping attack for " + player.getName() + " - Bedrock player detected");
+                return;
+            }
             if (!data.isInCombat()) {
                 data.clearBuffer();
                 data.getAimProcessor().reset();
                 plugin.debug("[AI] New combat started for " + player.getName() + ", cleared old data");
             }
             data.onAttack();
-            plugin.debug("[AI] Attack registered for " + player.getName() + 
-                ", buffer=" + data.getBufferSize() + "/" + sequence);
+            plugin.debug("[AI] Attack registered for " + player.getName() +
+                    ", buffer=" + data.getBufferSize() + "/" + sequence);
         });
     }
+
     public void onTeleport(Player player) {
         if (!config.isAiEnabled()) {
             return;
@@ -126,6 +137,7 @@ public class AICheck {
             }
         });
     }
+
     public void onTick(Player player) {
         if (!config.isAiEnabled()) {
             return;
@@ -138,11 +150,13 @@ public class AICheck {
         }
         schedulerAdapter.runEntitySync(player, () -> {
             AIPlayerData data = getOrCreatePlayerData(player);
+            if (data.isBedrock())
+                return;
             data.incrementTicksSinceAttack();
             if (data.getTicksSinceAttack() > sequence) {
                 if (!data.isPendingRequest() && data.getBufferSize() >= sequence) {
-                    plugin.debug("[AI] Combat ended for " + player.getName() + 
-                        ", sending final buffer (" + data.getBufferSize() + " ticks)");
+                    plugin.debug("[AI] Combat ended for " + player.getName() +
+                            ", sending final buffer (" + data.getBufferSize() + " ticks)");
                     data.setPendingRequest(true);
                     sendDataToAI(player, data);
                 }
@@ -154,6 +168,7 @@ public class AICheck {
             }
         });
     }
+
     public void onRotationPacket(Player player, float yaw, float pitch) {
         if (!config.isAiEnabled()) {
             return;
@@ -176,6 +191,8 @@ public class AICheck {
                 plugin.debug("[AI] Skipping rotation for " + player.getName() + " - in disabled WorldGuard region");
                 return;
             }
+            if (data.isBedrock())
+                return;
             data.processTick(yaw, pitch);
             data.incrementStepCounter();
             if (data.shouldSendData(step, sequence)) {
@@ -185,31 +202,32 @@ public class AICheck {
             }
         });
     }
+
     private void sendDataToAI(Player player, AIPlayerData data) {
         List<TickData> ticks = data.getTickBuffer();
         if (ticks.size() < sequence) {
-            plugin.debug("[AI] Not enough ticks for " + player.getName() + 
-                ": " + ticks.size() + "/" + sequence);
+            plugin.debug("[AI] Not enough ticks for " + player.getName() +
+                    ": " + ticks.size() + "/" + sequence);
             return;
         }
         IAIClient client = clientProvider.get();
         if (client == null) {
             return;
         }
-        plugin.debug("[AI] Sending " + ticks.size() + " ticks for " + player.getName() + 
-            " (ticksSinceAttack=" + data.getTicksSinceAttack() + ")");
+        plugin.debug("[AI] Sending " + ticks.size() + " ticks for " + player.getName() +
+                " (ticksSinceAttack=" + data.getTicksSinceAttack() + ")");
         if (config.isDebug()) {
             plugin.debug("[AI] === TICK BUFFER START ===");
             int i = 0;
             for (TickData tick : ticks) {
-                plugin.debug("[AI] Tick[" + i + "]: dYaw=" + String.format("%.4f", tick.deltaYaw) + 
-                    ", dPitch=" + String.format("%.4f", tick.deltaPitch) +
-                    ", aYaw=" + String.format("%.4f", tick.accelYaw) +
-                    ", aPitch=" + String.format("%.4f", tick.accelPitch) +
-                    ", jYaw=" + String.format("%.4f", tick.jerkYaw) +
-                    ", jPitch=" + String.format("%.4f", tick.jerkPitch) +
-                    ", gcdYaw=" + String.format("%.4f", tick.gcdErrorYaw) +
-                    ", gcdPitch=" + String.format("%.4f", tick.gcdErrorPitch));
+                plugin.debug("[AI] Tick[" + i + "]: dYaw=" + String.format("%.4f", tick.deltaYaw) +
+                        ", dPitch=" + String.format("%.4f", tick.deltaPitch) +
+                        ", aYaw=" + String.format("%.4f", tick.accelYaw) +
+                        ", aPitch=" + String.format("%.4f", tick.accelPitch) +
+                        ", jYaw=" + String.format("%.4f", tick.jerkYaw) +
+                        ", jPitch=" + String.format("%.4f", tick.jerkPitch) +
+                        ", gcdYaw=" + String.format("%.4f", tick.gcdErrorYaw) +
+                        ", gcdPitch=" + String.format("%.4f", tick.gcdErrorPitch));
                 i++;
             }
             plugin.debug("[AI] === TICK BUFFER END ===");
@@ -218,15 +236,17 @@ public class AICheck {
         final UUID playerUuid = player.getUniqueId();
         final String playerName = player.getName();
         client.predict(serialized, playerUuid.toString())
-            .thenAccept(response -> processResponse(playerUuid, playerName, data, response))
-            .exceptionally(error -> {
-                handleError(playerName, data, error);
-                return null;
-            });
+                .thenAccept(response -> processResponse(playerUuid, playerName, data, response))
+                .exceptionally(error -> {
+                    handleError(playerName, data, error);
+                    return null;
+                });
     }
+
     private boolean isClientAvailable() {
         return clientProvider != null && clientProvider.isAvailable();
     }
+
     private void processResponse(UUID playerUuid, String playerName, AIPlayerData data, AIResponse response) {
         schedulerAdapter.runSync(() -> {
             data.setPendingRequest(false);
@@ -236,10 +256,10 @@ public class AICheck {
                 return;
             }
             double probability = response.getProbability();
-            plugin.debug("[AI] Response for " + playerName + ": probability=" + 
-                String.format("%.3f", probability));
-            data.updateBuffer(probability, config.getAiBufferMultiplier(), 
-                config.getAiBufferDecrease(), config.getAiAlertThreshold());
+            plugin.debug("[AI] Response for " + playerName + ": probability=" +
+                    String.format("%.3f", probability));
+            data.updateBuffer(probability, config.getAiBufferMultiplier(),
+                    config.getAiBufferDecrease(), config.getAiAlertThreshold());
             if (alertManager.shouldAlert(probability)) {
                 alertManager.sendAlert(playerName, probability, data.getBuffer());
             }
@@ -254,6 +274,7 @@ public class AICheck {
             }
         });
     }
+
     private void handleInvalidSequence(String error) {
         try {
             String[] parts = error.split(":");
@@ -271,6 +292,7 @@ public class AICheck {
             logger.warning("[AI] Failed to parse new sequence from error: " + error);
         }
     }
+
     private void handleError(String playerName, AIPlayerData data, Throwable error) {
         if (data != null) {
             data.setPendingRequest(false);
@@ -278,28 +300,40 @@ public class AICheck {
         Throwable cause = error.getCause() != null ? error.getCause() : error;
         logger.warning("[AI] Error for " + playerName + ": " + cause.getMessage());
     }
+
     private AIPlayerData getOrCreatePlayerData(Player player) {
-        return playerData.computeIfAbsent(player.getUniqueId(), 
-            uuid -> new AIPlayerData(uuid, sequence));
+        return playerData.computeIfAbsent(player.getUniqueId(),
+                uuid -> {
+                    AIPlayerData data = new AIPlayerData(uuid, sequence);
+                    if (GeyserUtil.isBedrockPlayer(uuid)) {
+                        data.setBedrock(true);
+                        logger.info("[AI] Detected Bedrock player: " + player.getName() + " - bypassing checks");
+                    }
+                    return data;
+                });
     }
+
     public AIPlayerData getPlayerData(UUID playerId) {
         return playerData.get(playerId);
     }
+
     public void handlePlayerQuit(Player player) {
-        AIPlayerData data = playerData.remove(player.getUniqueId());
-        if (data != null) {
-            data.fullReset();
-        }
+        // We no longer remove data on quit to keep history persistent as requested.
+        // Data will just sit in memory until server restart or manual clear.
     }
+
     public void clearAll() {
         playerData.clear();
     }
+
     public int getSequence() {
         return sequence;
     }
+
     public int getStep() {
         return step;
     }
+
     public WorldGuardCompat getWorldGuardCompat() {
         return worldGuardCompat;
     }

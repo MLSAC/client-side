@@ -47,17 +47,19 @@ public class PlayerListener implements Listener {
     private final ViolationManager violationManager;
     private final SessionManager sessionManager;
     private final TickListener tickListener;
+    private final wtf.mlsac.hologram.NametagManager nametagManager;
     private HitListener hitListener;
 
     public PlayerListener(JavaPlugin plugin, AICheck aiCheck, AlertManager alertManager,
             ViolationManager violationManager, SessionManager sessionManager,
-            TickListener tickListener) {
+            TickListener tickListener, wtf.mlsac.hologram.NametagManager nametagManager) {
         this.plugin = plugin;
         this.aiCheck = aiCheck;
         this.alertManager = alertManager;
         this.violationManager = violationManager;
         this.sessionManager = sessionManager;
         this.tickListener = tickListener;
+        this.nametagManager = nametagManager;
     }
 
     public void setHitListener(HitListener hitListener) {
@@ -129,6 +131,9 @@ public class PlayerListener implements Listener {
         }
         if (sessionManager != null) {
             sessionManager.removeAimProcessor(player.getUniqueId());
+        }
+        if (nametagManager != null) {
+            nametagManager.handlePlayerQuit(player);
         }
     }
 }

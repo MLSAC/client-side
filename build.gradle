@@ -29,12 +29,21 @@ repositories {
         name = "enginehub"
         url = "https://maven.enginehub.org/repo/"
     }
+    maven {
+        name = "opencollab-snapshots"
+        url = "https://repo.opencollab.dev/maven-snapshots/"
+    }
+    maven {
+        name = "opencollab-releases"
+        url = "https://repo.opencollab.dev/maven-releases/"
+    }
 }
 
 dependencies {
     compileOnly "io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT"
     compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
-    compileOnly 'com.github.retrooper:packetevents-spigot:2.11.1'
+    compileOnly 'com.github.retrooper:packetevents-spigot:2.11.2'
+    compileOnly 'org.geysermc.geyser:api:2.2.0-SNAPSHOT'
     implementation 'com.google.flatbuffers:flatbuffers-java:24.3.25'
     implementation 'com.microsoft.signalr:signalr:8.0.0'
     implementation 'com.microsoft.signalr.messagepack:signalr-messagepack:8.0.0'
@@ -50,7 +59,7 @@ dependencies {
 }
 
 dependencies {
-    implementation 'com.github.retrooper:packetevents-spigot:2.11.1'
+    implementation 'com.github.retrooper:packetevents-spigot:2.11.2'
 }
 
 // Multi-build configuration for Java 17 and 21

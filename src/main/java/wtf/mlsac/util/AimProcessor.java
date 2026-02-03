@@ -21,9 +21,10 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.util;
+
 import wtf.mlsac.data.TickData;
+
 public class AimProcessor {
     private static final int SIGNIFICANT_SAMPLES_THRESHOLD = 15;
     private static final float MAX_DELTA_FOR_GCD = 5.0f;
@@ -43,14 +44,17 @@ public class AimProcessor {
     private double modeX;
     private double modeY;
     private boolean hasLastRotation;
+
     public AimProcessor() {
         this(TOTAL_SAMPLES_THRESHOLD);
     }
+
     public AimProcessor(int modeSize) {
         this.xRotMode = new RunningMode(modeSize);
         this.yRotMode = new RunningMode(modeSize);
         reset();
     }
+
     public void reset() {
         lastYaw = 0;
         lastPitch = 0;
@@ -68,6 +72,7 @@ public class AimProcessor {
         xRotMode.clear();
         yRotMode.clear();
     }
+
     public TickData process(float yaw, float pitch) {
         float deltaYaw = hasLastRotation ? normalizeAngle(yaw - lastYaw) : 0;
         float deltaPitch = hasLastRotation ? pitch - lastPitch : 0;
@@ -99,14 +104,18 @@ public class AimProcessor {
         lastDeltaYaw = deltaYaw;
         lastDeltaPitch = deltaPitch;
         hasLastRotation = true;
-        return new TickData(deltaYaw, deltaPitch, currentYawAccel, currentPitchAccel, 
-                           jerkYaw, jerkPitch, gcdErrorYaw, gcdErrorPitch);
+        return new TickData(deltaYaw, deltaPitch, currentYawAccel, currentPitchAccel,
+                jerkYaw, jerkPitch, gcdErrorYaw, gcdErrorPitch);
     }
+
     private float normalizeAngle(float angle) {
-        while (angle > 180) angle -= 360;
-        while (angle < -180) angle += 360;
+        while (angle > 180)
+            angle -= 360;
+        while (angle < -180)
+            angle += 360;
         return angle;
     }
+
     private void updateModes() {
         if (xRotMode.size() > SIGNIFICANT_SAMPLES_THRESHOLD) {
             Pair<Double, Integer> modeResult = xRotMode.getMode();
@@ -121,6 +130,7 @@ public class AimProcessor {
             }
         }
     }
+
     private float calculateGcdError(float delta, double mode) {
         if (mode == 0) {
             return 0;
@@ -130,28 +140,51 @@ public class AimProcessor {
         double error = Math.min(remainder, mode - remainder);
         return (float) error;
     }
+
     public double getModeX() {
         return modeX;
     }
+
     public double getModeY() {
         return modeY;
     }
+
     public RunningMode getXRotMode() {
         return xRotMode;
     }
+
     public RunningMode getYRotMode() {
         return yRotMode;
     }
+
     public float getCurrentYawAccel() {
         return currentYawAccel;
     }
+
     public float getCurrentPitchAccel() {
         return currentPitchAccel;
     }
+
     public float getLastYawAccel() {
         return lastYawAccel;
     }
+
     public float getLastPitchAccel() {
         return lastPitchAccel;
+    }
+
+    public int getSensitivity() {
+        if (modeY <= 0) {
+            return -1;
+        }
+        double f = Math.cbrt(modeY / 1.2);
+        double sensitivity = (f - 0.2) / 0.6;
+        return (int) Math.round(sensitivity * 200); // Usually 0-200% in Minecraft settings, or 0-100% depending on
+                                                    // interpretation.
+        // Minecraft internal sensitivity is 0.0-1.0.
+        // 100% in menu is 0.5 internal. 200% is 1.0 internal.
+        // Actually, let's just return the % value (0-200).
+        // If sens is 1.0 (Hyper Speed), (1.0 * 0.6 + 0.2) = 0.8. 0.8^3 = 0.512. * 1.2 =
+        // 0.6144.
     }
 }

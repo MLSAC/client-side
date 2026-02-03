@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr;
+
 import com.microsoft.signalr.HubConnection;
 import com.microsoft.signalr.HubConnectionBuilder;
 import com.microsoft.signalr.HubConnectionState;
@@ -32,6 +32,7 @@ import wtf.mlsac.signalr.dto.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 public class SignalRSessionManager {
     private static final long SERVER_TIMEOUT_MS = 60000;
     private static final long KEEP_ALIVE_INTERVAL_MS = 15000;
@@ -44,26 +45,30 @@ public class SignalRSessionManager {
     private volatile boolean sessionValid;
     private volatile long lastServerTime;
     private java.util.function.Consumer<Throwable> onDisconnectedCallback;
-    public SignalRSessionManager(String serverAddress, SignalREndpointConfig endpointConfig, Logger logger, boolean debug) {
+
+    public SignalRSessionManager(String serverAddress, SignalREndpointConfig endpointConfig, Logger logger,
+            boolean debug) {
         this.logger = logger;
         this.endpointConfig = endpointConfig;
         this.hubUrl = endpointConfig.getHubUrl(serverAddress);
         this.sessionValid = false;
         this.debug = debug;
     }
+
     public void setOnDisconnectedCallback(java.util.function.Consumer<Throwable> callback) {
         this.onDisconnectedCallback = callback;
     }
+
     public void initialize() {
         this.hubConnection = HubConnectionBuilder.create(hubUrl)
-            .setHttpClientBuilderCallback(builder -> {
-                builder.addInterceptor(new SignalRNegotiateInterceptor(logger, debug));
-            })
-            .withTransport(TransportEnum.WEBSOCKETS)
-            .withHubProtocol(new MessagePackHubProtocol())
-            .withServerTimeout(SERVER_TIMEOUT_MS)
-            .withKeepAliveInterval(KEEP_ALIVE_INTERVAL_MS)
-            .build();
+                .setHttpClientBuilderCallback(builder -> {
+                    builder.addInterceptor(new SignalRNegotiateInterceptor(logger, debug));
+                })
+                .withTransport(TransportEnum.WEBSOCKETS)
+                .withHubProtocol(new MessagePackHubProtocol())
+                .withServerTimeout(SERVER_TIMEOUT_MS)
+                .withKeepAliveInterval(KEEP_ALIVE_INTERVAL_MS)
+                .build();
         hubConnection.onClosed(exception -> {
             sessionValid = false;
             if (exception != null) {
@@ -76,6 +81,7 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public CompletableFuture<Void> startConnection() {
         if (hubConnection == null) {
             initialize();
@@ -89,25 +95,26 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public CompletableFuture<String> createSession(String apiKey, String pluginHash) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String methodName = endpointConfig.getMethodName("connect");
                 if (debug) {
-                    logger.info("[SignalR] Calling " + methodName + " with api_key=" + 
-                        apiKey.substring(0, Math.min(8, apiKey.length())) + "..., plugin_hash=" + pluginHash);
+                    logger.info("[SignalR] Calling " + methodName + " with api_key=" +
+                            apiKey.substring(0, Math.min(8, apiKey.length())) + "..., plugin_hash=" + pluginHash);
                 }
                 ConnectRequest request = new ConnectRequest(apiKey, pluginHash);
                 ConnectResponse response = hubConnection.invoke(ConnectResponse.class, methodName, request)
-                    .blockingGet();
+                        .blockingGet();
                 if (response == null || response.sessionId == null || response.sessionId.isEmpty()) {
                     throw new SessionException("Empty session ID received");
                 }
                 this.sessionId = response.sessionId;
                 this.lastServerTime = response.serverTime;
                 this.sessionValid = true;
-                logger.info("[SignalR] Session created: " + 
-                    sessionId.substring(0, Math.min(8, sessionId.length())) + "...");
+                logger.info("[SignalR] Session created: " +
+                        sessionId.substring(0, Math.min(8, sessionId.length())) + "...");
                 return sessionId;
             } catch (Exception e) {
                 this.sessionValid = false;
@@ -122,16 +129,17 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public CompletableFuture<HeartbeatResult> sendHeartbeat() {
         if (!isSessionValid()) {
             return CompletableFuture.completedFuture(
-                new HeartbeatResult(false, 0, "No active session"));
+                    new HeartbeatResult(false, 0, "No active session"));
         }
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String methodName = endpointConfig.getMethodName("heartbeat");
                 HeartbeatResponse response = hubConnection.invoke(HeartbeatResponse.class, methodName)
-                    .blockingGet();
+                        .blockingGet();
                 long serverTime = response != null ? response.serverTime : 0;
                 this.lastServerTime = serverTime;
                 return new HeartbeatResult(true, serverTime, null);
@@ -145,29 +153,30 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public CompletableFuture<ReportStatsResult> reportStats(int onlinePlayers) {
         if (!isSessionValid()) {
             logger.warning("[SignalR] Cannot call ReportStats - no active session");
             return CompletableFuture.completedFuture(
-                new ReportStatsResult(false, false, 0, "No active session"));
+                    new ReportStatsResult(false, false, 0, "No active session"));
         }
-        
+
         // Проверка состояния подключения
         HubConnectionState state = hubConnection.getConnectionState();
         if (state != HubConnectionState.CONNECTED) {
             logger.severe("[SignalR] Cannot call ReportStats - not connected! State: " + state);
             return CompletableFuture.completedFuture(
-                new ReportStatsResult(false, false, 0, "Not connected, state: " + state));
+                    new ReportStatsResult(false, false, 0, "Not connected, state: " + state));
         }
-        
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String methodName = endpointConfig.getMethodName("reportStats");
                 ReportStatsRequest request = new ReportStatsRequest(onlinePlayers);
-                
+
                 logger.info("[SignalR] Connection state OK, calling ReportStats...");
                 logger.info("[SignalR] Preparing to call " + methodName + " with onlinePlayers=" + onlinePlayers);
-                
+
                 // Логирование JSON для отладки
                 if (debug) {
                     try {
@@ -178,16 +187,16 @@ public class SignalRSessionManager {
                         logger.warning("[SignalR] Failed to serialize request to JSON: " + jsonEx.getMessage());
                     }
                 }
-                
+
                 logger.info("[SignalR] ReportStats invoked, waiting for response...");
-                
+
                 // Вызов с timeout через get() с таймаутом
                 ReportStatsResponse response;
                 try {
                     response = hubConnection.invoke(ReportStatsResponse.class, methodName, request)
-                        .timeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                        .toFuture()
-                        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                            .timeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                            .toFuture()
+                            .get(5, java.util.concurrent.TimeUnit.SECONDS);
                 } catch (java.util.concurrent.TimeoutException timeoutEx) {
                     logger.severe("[SignalR] ReportStats timeout after 5 seconds");
                     logger.severe("[SignalR] Exception type: " + timeoutEx.getClass().getName());
@@ -201,59 +210,61 @@ public class SignalRSessionManager {
                     }
                     throw execEx;
                 }
-                
+
                 logger.info("[SignalR] ReportStats completed successfully!");
-                
+
                 boolean limitExceeded = response != null && response.limitExceeded;
                 int maxOnline = response != null ? response.maxOnline : 0;
-                
+
                 if (debug) {
-                    logger.info("[SignalR] ReportStats response: limitExceeded=" + limitExceeded + 
-                        ", maxOnline=" + maxOnline);
+                    logger.info("[SignalR] ReportStats response: limitExceeded=" + limitExceeded +
+                            ", maxOnline=" + maxOnline);
                 }
-                
+
                 return new ReportStatsResult(true, limitExceeded, maxOnline, null);
-                
+
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.severe("[SignalR] ReportStats interrupted");
                 logger.severe("[SignalR] Exception type: " + e.getClass().getName());
                 return new ReportStatsResult(false, false, 0, "Interrupted");
-                
+
             } catch (Throwable e) {
                 logger.severe("[SignalR] ReportStats failed with exception");
                 logger.severe("[SignalR] Exception type: " + e.getClass().getName());
                 logger.severe("[SignalR] Exception message: " + e.getMessage());
-                
+
                 HubErrorParser.HubError hubError = HubErrorParser.parse(e.getMessage());
                 logger.severe("[SignalR] Parsed error code: " + hubError.getCode());
                 logger.severe("[SignalR] Parsed error message: " + hubError.getMessage());
-                
+
                 if (HubErrorParser.NOT_AUTHENTICATED.equals(hubError.getCode())) {
                     this.sessionValid = false;
                     logger.warning("[SignalR] Session invalidated due to NOT_AUTHENTICATED error");
                 }
-                
+
                 return new ReportStatsResult(false, false, 0, hubError.getMessage());
             }
         });
     }
+
     public CompletableFuture<PredictResult> predict(byte[] playerData, String playerUuid) {
         if (!isSessionValid()) {
             return CompletableFuture.completedFuture(
-                new PredictResult(false, 0, 0, "NOT_AUTHENTICATED", "No active session"));
+                    new PredictResult(false, 0, 0, "NOT_AUTHENTICATED", "No active session"));
         }
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String methodName = endpointConfig.getMethodName("predict");
                 PredictRequest request = new PredictRequest(playerData, playerUuid);
                 PredictResponse response = hubConnection.invoke(PredictResponse.class, methodName, request)
-                    .blockingGet();
+                        .blockingGet();
                 if (response == null) {
                     return new PredictResult(false, 0, 0, "INVALID_RESPONSE", "Null response from server");
                 }
                 if (Float.isNaN(response.probability) || Float.isInfinite(response.probability)) {
-                    return new PredictResult(false, 0, 0, "INVALID_DATA", "Server returned invalid probability: " + response.probability);
+                    return new PredictResult(false, 0, 0, "INVALID_DATA",
+                            "Server returned invalid probability: " + response.probability);
                 }
                 float probability = Math.max(0.0f, Math.min(1.0f, response.probability));
                 return new PredictResult(true, probability, response.inferenceTimeMs, null, null);
@@ -267,11 +278,12 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public CompletableFuture<Void> closeSession() {
         return CompletableFuture.runAsync(() -> {
             try {
-                if (hubConnection != null && 
-                    hubConnection.getConnectionState() == HubConnectionState.CONNECTED) {
+                if (hubConnection != null &&
+                        hubConnection.getConnectionState() == HubConnectionState.CONNECTED) {
                     hubConnection.stop().blockingAwait();
                 }
             } catch (Exception e) {
@@ -282,78 +294,134 @@ public class SignalRSessionManager {
             }
         });
     }
+
     public boolean isSessionValid() {
-        return sessionValid && 
-               sessionId != null && 
-               hubConnection != null && 
-               hubConnection.getConnectionState() == HubConnectionState.CONNECTED;
+        return sessionValid &&
+                sessionId != null &&
+                hubConnection != null &&
+                hubConnection.getConnectionState() == HubConnectionState.CONNECTED;
     }
+
     public String getSessionId() {
         return sessionId;
     }
+
     public long getLastServerTime() {
         return lastServerTime;
     }
+
     public HubConnectionState getConnectionState() {
         return hubConnection != null ? hubConnection.getConnectionState() : HubConnectionState.DISCONNECTED;
     }
+
     public void invalidateSession() {
         this.sessionValid = false;
     }
+
     public static class HeartbeatResult {
         private final boolean success;
         private final long serverTime;
         private final String error;
+
         public HeartbeatResult(boolean success, long serverTime, String error) {
             this.success = success;
             this.serverTime = serverTime;
             this.error = error;
         }
-        public boolean isSuccess() { return success; }
-        public long getServerTime() { return serverTime; }
-        public String getError() { return error; }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public long getServerTime() {
+            return serverTime;
+        }
+
+        public String getError() {
+            return error;
+        }
     }
+
     public static class ReportStatsResult {
         private final boolean success;
         private final boolean limitExceeded;
         private final int maxOnline;
         private final String error;
+
         public ReportStatsResult(boolean success, boolean limitExceeded, int maxOnline, String error) {
             this.success = success;
             this.limitExceeded = limitExceeded;
             this.maxOnline = maxOnline;
             this.error = error;
         }
-        public boolean isSuccess() { return success; }
-        public boolean isLimitExceeded() { return limitExceeded; }
-        public int getMaxOnline() { return maxOnline; }
-        public String getError() { return error; }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public boolean isLimitExceeded() {
+            return limitExceeded;
+        }
+
+        public int getMaxOnline() {
+            return maxOnline;
+        }
+
+        public String getError() {
+            return error;
+        }
     }
+
     public static class PredictResult {
         private final boolean success;
         private final float probability;
         private final long inferenceTimeMs;
         private final String errorCode;
         private final String errorMessage;
-        public PredictResult(boolean success, float probability, long inferenceTimeMs, 
-                            String errorCode, String errorMessage) {
+
+        public PredictResult(boolean success, float probability, long inferenceTimeMs,
+                String errorCode, String errorMessage) {
             this.success = success;
             this.probability = probability;
             this.inferenceTimeMs = inferenceTimeMs;
             this.errorCode = errorCode;
             this.errorMessage = errorMessage;
         }
-        public boolean isSuccess() { return success; }
-        public float getProbability() { return probability; }
-        public long getInferenceTimeMs() { return inferenceTimeMs; }
-        public String getErrorCode() { return errorCode; }
-        public String getErrorMessage() { return errorMessage; }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public float getProbability() {
+            return probability;
+        }
+
+        public long getInferenceTimeMs() {
+            return inferenceTimeMs;
+        }
+
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
     }
+
     public static class SessionException extends RuntimeException {
-        public SessionException(String message) { super(message); }
-        public SessionException(String message, Throwable cause) { super(message, cause); }
+        public SessionException(String message) {
+            super(message);
+        }
+
+        public SessionException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
+
     public static class AuthenticationException extends SessionException {
-        public AuthenticationException(String message) { super(message); }
+        public AuthenticationException(String message) {
+            super(message);
+        }
     }
 }

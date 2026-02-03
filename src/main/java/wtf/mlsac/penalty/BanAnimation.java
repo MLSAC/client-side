@@ -21,8 +21,11 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.penalty;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -42,6 +45,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
@@ -51,19 +55,23 @@ import wtf.mlsac.scheduler.ScheduledTask;
 import wtf.mlsac.scheduler.SchedulerManager;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
+
 public class BanAnimation implements Listener {
     private final JavaPlugin plugin;
+    private final Map<UUID, String> pendingBans = new ConcurrentHashMap<>();
     private final Set<UUID> animatingPlayers = new HashSet<>();
     private static final int LEVITATION_DURATION = 60;
     private static final int TOTAL_ANIMATION_TICKS = 80;
     private static final double LEVITATION_HEIGHT = 2.0;
+
     public BanAnimation(JavaPlugin plugin) {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
+
     public void playAnimation(Player player, String banCommand, PenaltyContext context) {
-        if (player == null) return;
+        if (player == null)
+            return;
         if (!Bukkit.isPrimaryThread()) {
             SchedulerManager.getAdapter().runSync(() -> playAnimation(player, banCommand, context));
             return;
@@ -78,14 +86,15 @@ public class BanAnimation implements Listener {
         }
         plugin.getLogger().info(">>> STAGE 1: Starting ban animation for " + player.getName());
         animatingPlayers.add(playerId);
+        pendingBans.put(playerId, banCommand);
         freezePlayer(player);
-        final int[] tick = {0};
+        final int[] tick = { 0 };
         final ScheduledTask[] taskRef = new ScheduledTask[1];
         taskRef[0] = SchedulerManager.getAdapter().runSyncRepeating(() -> {
             try {
                 if (!player.isOnline()) {
                     taskRef[0].cancel();
-                    animatingPlayers.remove(playerId);
+                    handleQuit(playerId);
                     return;
                 }
                 tick[0]++;
@@ -102,22 +111,37 @@ public class BanAnimation implements Listener {
                     spawnExplosionParticles(player.getLocation());
                     plugin.getLogger().info(">>> STAGE 2: Animation finished, banning " + player.getName());
                     taskRef[0].cancel();
-                    animatingPlayers.remove(playerId);
-                    if (player.isOnline()) {
-                        unfreezePlayer(player);
-                    }
+                    cleanup(player);
                     executeBanCommand(banCommand);
                 }
             } catch (Exception e) {
                 plugin.getLogger().severe("CRITICAL ERROR IN BAN ANIMATION: " + e.getMessage());
                 taskRef[0].cancel();
-                animatingPlayers.remove(playerId);
-                if (player.isOnline()) {
-                    unfreezePlayer(player);
-                }
+                cleanup(player);
+                executeBanCommand(banCommand);
             }
         }, 0L, 1L);
     }
+
+    private void cleanup(Player player) {
+        UUID uuid = player.getUniqueId();
+        animatingPlayers.remove(uuid);
+        pendingBans.remove(uuid);
+        if (player.isOnline()) {
+            unfreezePlayer(player);
+        }
+    }
+
+    private void handleQuit(UUID playerId) {
+        if (animatingPlayers.remove(playerId)) {
+            String command = pendingBans.remove(playerId);
+            if (command != null) {
+                plugin.getLogger().info("Player " + playerId + " quit during animation. Executing immediate ban.");
+                executeBanCommand(command);
+            }
+        }
+    }
+
     private void freezePlayer(Player player) {
         PotionEffectType slowness = EffectCompat.getSlowness();
         PotionEffectType jumpBoost = EffectCompat.getJumpBoost();
@@ -136,10 +160,12 @@ public class BanAnimation implements Listener {
             player.setFlying(false);
         }
     }
+
     private void unfreezePlayer(Player player) {
         EffectCompat.removeEffect(player, EffectCompat.getSlowness());
         EffectCompat.removeEffect(player, EffectCompat.getJumpBoost());
     }
+
     private void spawnRisingParticles(Location center, int tick) {
         Particle witchParticle = ParticleCompat.getWitchParticle();
         Particle heartParticle = ParticleCompat.getHeartParticle();
@@ -158,12 +184,12 @@ public class BanAnimation implements Listener {
         double spiralAngle = Math.toRadians(tick * 20);
         double spiralRadius = 0.8;
         Location spiralLoc = center.clone().add(
-            Math.cos(spiralAngle) * spiralRadius,
-            0,
-            Math.sin(spiralAngle) * spiralRadius
-        );
+                Math.cos(spiralAngle) * spiralRadius,
+                0,
+                Math.sin(spiralAngle) * spiralRadius);
         ParticleCompat.spawnParticle(center.getWorld(), dragonBreathParticle, spiralLoc, 3, 0.05, 0.05, 0.05, 0);
     }
+
     private void spawnSphereParticles(Location center, double radius, int tick) {
         int particleCount = 20;
         Particle witchParticle = ParticleCompat.getWitchParticle();
@@ -179,14 +205,14 @@ public class BanAnimation implements Listener {
             ParticleCompat.spawnParticle(center.getWorld(), witchParticle, particleLoc, 1, 0, 0, 0, 0);
             if (i % 3 == 0 && dustParticle != null) {
                 Particle.DustOptions dust = new Particle.DustOptions(
-                    org.bukkit.Color.fromRGB(255, 105, 180),
-                    1.0f
-                );
+                        org.bukkit.Color.fromRGB(255, 105, 180),
+                        1.0f);
                 ParticleCompat.spawnParticle(center.getWorld(), dustParticle, particleLoc, 1, 0, 0, 0, 0, dust);
             }
         }
         ParticleCompat.spawnParticle(center.getWorld(), endRodParticle, center, 5, 0.3, 0.5, 0.3, 0.02);
     }
+
     private void spawnExplosionParticles(Location center) {
         Particle explosionParticle = ParticleCompat.getExplosionParticle();
         Particle witchParticle = ParticleCompat.getWitchParticle();
@@ -195,40 +221,49 @@ public class BanAnimation implements Listener {
         ParticleCompat.spawnParticle(center.getWorld(), explosionParticle, center, 1, 0, 0, 0, 0);
         for (int i = 0; i < 50; i++) {
             Vector dir = new Vector(
-                Math.random() * 2 - 1,
-                Math.random() * 2 - 1,
-                Math.random() * 2 - 1
-            ).normalize().multiply(2);
+                    Math.random() * 2 - 1,
+                    Math.random() * 2 - 1,
+                    Math.random() * 2 - 1).normalize().multiply(2);
             Location particleLoc = center.clone().add(dir);
             ParticleCompat.spawnParticle(center.getWorld(), witchParticle, particleLoc, 3, 0.1, 0.1, 0.1, 0);
         }
         if (dustParticle != null) {
             Particle.DustOptions pinkDust = new Particle.DustOptions(
-                org.bukkit.Color.fromRGB(255, 20, 147),
-                2.0f
-            );
+                    org.bukkit.Color.fromRGB(255, 20, 147),
+                    2.0f);
             ParticleCompat.spawnParticle(center.getWorld(), dustParticle, center, 100, 1.5, 1.5, 1.5, 0, pinkDust);
         }
         ParticleCompat.spawnParticle(center.getWorld(), soulParticle, center, 30, 0.5, 0.5, 0.5, 0.1);
     }
+
     private double easeOutQuad(double t) {
         return 1 - (1 - t) * (1 - t);
     }
+
     private void executeBanCommand(String command) {
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
     }
+
     public boolean isAnimating(UUID playerId) {
         return animatingPlayers.contains(playerId);
     }
+
     public boolean isAnimating(Player player) {
         return player != null && animatingPlayers.contains(player.getUniqueId());
     }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        handleQuit(event.getPlayer().getUniqueId());
+    }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerMove(PlayerMoveEvent event) {
         if (isAnimating(event.getPlayer())) {
             Location from = event.getFrom();
             Location to = event.getTo();
-            if (to == null) return;
+            if (to == null)
+                return;
             if (from.getX() != to.getX() || from.getZ() != to.getZ()) {
                 Location newTo = to.clone();
                 newTo.setX(from.getX());
@@ -237,24 +272,28 @@ public class BanAnimation implements Listener {
             }
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (isAnimating(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
         if (isAnimating(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerDropItem(PlayerDropItemEvent event) {
         if (isAnimating(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player) {
@@ -264,6 +303,7 @@ public class BanAnimation implements Listener {
             }
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInventoryOpen(InventoryOpenEvent event) {
         if (event.getPlayer() instanceof Player) {
@@ -273,18 +313,21 @@ public class BanAnimation implements Listener {
             }
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onBlockBreak(BlockBreakEvent event) {
         if (isAnimating(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onBlockPlace(BlockPlaceEvent event) {
         if (isAnimating(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player) {
@@ -300,6 +343,7 @@ public class BanAnimation implements Listener {
             }
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onItemPickup(EntityPickupItemEvent event) {
         if (event.getEntity() instanceof Player) {
@@ -309,8 +353,10 @@ public class BanAnimation implements Listener {
             }
         }
     }
+
     public void shutdown() {
         HandlerList.unregisterAll(this);
         animatingPlayers.clear();
+        pendingBans.clear();
     }
 }

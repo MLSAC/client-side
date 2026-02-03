@@ -30,7 +30,11 @@ import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.commands.CommandHandler;
 import wtf.mlsac.compat.VersionAdapter;
 import wtf.mlsac.config.Config;
+import wtf.mlsac.config.HologramConfig;
+import wtf.mlsac.config.MenuConfig;
+import wtf.mlsac.config.MessagesConfig;
 import wtf.mlsac.datacollector.DataCollectorFactory;
+import wtf.mlsac.hologram.NametagManager;
 import wtf.mlsac.listeners.HitListener;
 import wtf.mlsac.listeners.PlayerListener;
 import wtf.mlsac.listeners.RotationListener;
@@ -49,6 +53,9 @@ import java.io.File;
 
 public final class Main extends JavaPlugin {
     private Config config;
+    private MenuConfig menuConfig;
+    private MessagesConfig messagesConfig;
+    private HologramConfig hologramConfig;
     private ISessionManager sessionManager;
     private FeatureCalculator featureCalculator;
     private TickListener tickListener;
@@ -60,6 +67,7 @@ public final class Main extends JavaPlugin {
     private AIClientProvider aiClientProvider;
     private AlertManager alertManager;
     private ViolationManager violationManager;
+    private NametagManager nametagManager;
     private AICheck aiCheck;
     private UpdateChecker updateChecker;
 
@@ -89,6 +97,13 @@ public final class Main extends JavaPlugin {
         VersionAdapter.get().logCompatibilityInfo();
         saveDefaultConfig();
         this.config = new Config(this, getLogger());
+        this.menuConfig = new MenuConfig(this);
+        this.menuConfig.load();
+        this.messagesConfig = new MessagesConfig(this);
+        this.messagesConfig.load();
+        this.hologramConfig = new HologramConfig(this);
+        this.hologramConfig.load();
+
         File outputDir = new File(config.getOutputDirectory());
         if (!outputDir.exists()) {
             outputDir.mkdirs();
@@ -100,6 +115,10 @@ public final class Main extends JavaPlugin {
         this.violationManager = new ViolationManager(this, config, alertManager);
         this.aiCheck = new AICheck(this, config, aiClientProvider, alertManager, violationManager);
         this.violationManager.setAICheck(aiCheck);
+
+        this.nametagManager = new NametagManager(this, aiCheck);
+        this.nametagManager.start();
+
         if (config.isAiEnabled()) {
             aiClientProvider.initialize().thenAccept(success -> {
                 if (success) {
@@ -109,16 +128,20 @@ public final class Main extends JavaPlugin {
                 }
             });
         }
-        this.tickListener = new TickListener(this, sessionManager, aiCheck);
+        this.tickListener = new TickListener(this, sessionManager, aiCheck, nametagManager);
         this.hitListener = new HitListener(sessionManager, aiCheck);
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
         this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager,
-                sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null, tickListener);
+                sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null, tickListener,
+                nametagManager);
         this.teleportListener = new TeleportListener(aiCheck);
         this.tickListener.setHitListener(hitListener);
         this.playerListener.setHitListener(hitListener);
         this.hitListener.cacheOnlinePlayers();
         this.tickListener.start();
+        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            this.tickListener.startPlayerTask(p);
+        }
         getServer().getPluginManager().registerEvents(playerListener, this);
         getServer().getPluginManager().registerEvents(teleportListener, this);
         PacketEvents.getAPI().getEventManager().registerListener(hitListener);
@@ -153,15 +176,15 @@ public final class Main extends JavaPlugin {
         if (tickListener != null) {
             tickListener.stop();
         }
+        if (nametagManager != null) {
+            nametagManager.stop();
+        }
         if (sessionManager != null) {
             getLogger().info("Stopping all active sessions...");
             sessionManager.stopAllSessions();
         }
         if (aiCheck != null) {
             aiCheck.clearAll();
-        }
-        if (violationManager != null) {
-            violationManager.shutdown();
         }
         if (commandHandler != null) {
             commandHandler.cleanup();
@@ -183,6 +206,18 @@ public final class Main extends JavaPlugin {
             try {
                 reloadConfig();
                 this.config = new Config(this, getLogger());
+                if (menuConfig != null)
+                    menuConfig.reload();
+                if (messagesConfig != null)
+                    messagesConfig.reload();
+                if (hologramConfig != null)
+                    hologramConfig.reload();
+
+                if (nametagManager != null) {
+                    nametagManager.stop();
+                    nametagManager.start();
+                }
+
                 alertManager.setConfig(config);
                 violationManager.setConfig(config);
                 aiCheck.setConfig(config);
@@ -204,6 +239,22 @@ public final class Main extends JavaPlugin {
                 e.printStackTrace();
             }
         });
+    }
+
+    public MenuConfig getMenuConfig() {
+        return menuConfig;
+    }
+
+    public MessagesConfig getMessagesConfig() {
+        return messagesConfig;
+    }
+
+    public HologramConfig getHologramConfig() {
+        return hologramConfig;
+    }
+
+    public NametagManager getNametagManager() {
+        return nametagManager;
     }
 
     public Config getPluginConfig() {
