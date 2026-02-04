@@ -1,8 +1,3 @@
-/*
- * This file is part of MLSAC - AI powered Anti-Cheat
- * Copyright (C) 2026 MLSAC Team
- */
-
 package wtf.mlsac.hologram;
 
 import com.github.retrooper.packetevents.PacketEvents;
@@ -44,7 +39,7 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
     private final AICheck aiCheck;
     private final Map<UUID, Integer> armorStandIds = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastSentText = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<UUID>> viewersMap = new ConcurrentHashMap<>(); // EntityOwnerUUID -> Set<ViewerUUID>
+    private final Map<UUID, Set<UUID>> viewersMap = new ConcurrentHashMap<>();
     private ScheduledTask task;
     private int cleanupCounter = 0;
 
@@ -62,7 +57,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
         PacketEvents.getAPI().getEventManager().registerListener(this);
         Bukkit.getPluginManager().registerEvents(this, plugin);
 
-        // Single global tick for all nametag updates (efficient O(A*N))
         task = SchedulerManager.getAdapter().runSyncRepeating(this::globalTick, 1L, 1L);
     }
 
@@ -72,7 +66,7 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
             task.cancel();
             task = null;
         }
-        // Destroy all existing entities for online admins
+
         for (UUID targetId : armorStandIds.keySet()) {
             despawnForall(targetId);
         }
@@ -91,7 +85,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
         if (player == null)
             return;
 
-        // If this player has a nametag, update its position for all viewers immediately
         Integer entityId = armorStandIds.get(player.getUniqueId());
         if (entityId == null)
             return;
@@ -128,8 +121,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
         }
 
         if (admins.isEmpty()) {
-            // Optional: cleanup if no one is watching?
-            // For now just skip logic.
             return;
         }
 
@@ -137,14 +128,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
             updateNametag(target, admins);
         }
 
-        // Periodic cleanup
-        // Using a static counter for simplicity, consider making it an instance field
-        // if this class is not a singleton
-        // or if multiple instances could exist. For a plugin, a single NametagManager
-        // is typical.
-        // If this is a static field, it should be declared outside the method.
-        // For now, assuming it's intended to be a static field for the class.
-        // Let's make it an instance field to be safe.
         if (++cleanupCounter > 100) {
             cleanupCounter = 0;
             cleanupOfflineViewers();
@@ -219,7 +202,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
             PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, spawn);
         }
 
-        // Only send metadata if it changed for this target OR if it's a new viewer
         if (isNew || textChanged) {
             List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> metadata = getVersionedMetadata(
                     viewer, text);
@@ -245,7 +227,7 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
     public void onTeleport(PlayerTeleportEvent event) {
         if (event.getFrom().getWorld() != event.getTo().getWorld())
             return;
-        if (event.getFrom().distanceSquared(event.getTo()) > 2500) { // > 50 blocks teleport
+        if (event.getFrom().distanceSquared(event.getTo()) > 2500) {
             for (UUID targetId : viewersMap.keySet()) {
                 removeViewer(targetId, event.getPlayer());
             }
@@ -255,7 +237,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
     public void handlePlayerQuit(Player player) {
         despawnForall(player.getUniqueId());
 
-        // Also ensure this player is removed from all viewers lists
         for (UUID targetId : viewersMap.keySet()) {
             removeViewer(targetId, player);
         }
@@ -277,27 +258,20 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
         List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> metadata = new ArrayList<>();
         int version = PacketEvents.getAPI().getPlayerManager().getClientVersion(viewer).getProtocolVersion();
 
-        // Basic Entity Metadata (Index 0: Flags, 0x20 = Invisible)
         metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
                 0, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE, (byte) 0x20));
 
         String colorized = ColorUtil.colorize(text);
 
-        if (version >= 393) { // 1.13+
-            // Custom Name (Index 2, Optional Component as JSON String in this PE version)
+        if (version >= 393) {
             net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
-            String json = com.github.retrooper.packetevents.util.adventure.AdventureSerializer.getGsonSerializer()
-                    .serialize(component);
-            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Optional<String>>(
+            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
                     2, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.OPTIONAL_COMPONENT,
-                    Optional.of(json)));
+                    Optional.of(component)));
 
-            // Custom Name Visible (Index 3, Boolean)
             metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Boolean>(
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         } else {
-            // 1.8 - 1.12
-            // Custom Name (Index 2, String)
             metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<String>(
                     2, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.STRING, colorized));
 
@@ -305,18 +279,19 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         }
 
-        // ArmorStand Marker Bit (Indices shift across versions)
-        int markerIndex = 10; // Default 1.8
-        if (version >= 755)
-            markerIndex = 15; // 1.17 - 1.21+
+        int markerIndex = 10;
+        if (version >= 766)
+            markerIndex = 16;
+        else if (version >= 755)
+            markerIndex = 15;
         else if (version >= 448)
-            markerIndex = 14; // 1.14 - 1.16.5
+            markerIndex = 14;
         else if (version >= 385)
-            markerIndex = 12; // 1.13
+            markerIndex = 12;
         else if (version >= 107)
-            markerIndex = 11; // 1.9 - 1.12
+            markerIndex = 11;
         else
-            markerIndex = 10; // 1.8
+            markerIndex = 10;
 
         metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
                 markerIndex, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE, (byte) 0x10));

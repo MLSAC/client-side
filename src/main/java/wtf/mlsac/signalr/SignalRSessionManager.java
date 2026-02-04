@@ -230,18 +230,20 @@ public class SignalRSessionManager {
                 return new ReportStatsResult(false, false, 0, "Interrupted");
 
             } catch (Throwable e) {
+                HubErrorParser.HubError hubError = HubErrorParser.parse(e.getMessage());
+
+                if (HubErrorParser.NOT_AUTHENTICATED.equals(hubError.getCode())) {
+                    this.sessionValid = false;
+                    logger.warning("[SignalR] ReportStats failed: Session invalidated (NOT_AUTHENTICATED)");
+                    return new ReportStatsResult(false, false, 0, hubError.getMessage());
+                }
+
                 logger.severe("[SignalR] ReportStats failed with exception");
                 logger.severe("[SignalR] Exception type: " + e.getClass().getName());
                 logger.severe("[SignalR] Exception message: " + e.getMessage());
 
-                HubErrorParser.HubError hubError = HubErrorParser.parse(e.getMessage());
                 logger.severe("[SignalR] Parsed error code: " + hubError.getCode());
                 logger.severe("[SignalR] Parsed error message: " + hubError.getMessage());
-
-                if (HubErrorParser.NOT_AUTHENTICATED.equals(hubError.getCode())) {
-                    this.sessionValid = false;
-                    logger.warning("[SignalR] Session invalidated due to NOT_AUTHENTICATED error");
-                }
 
                 return new ReportStatsResult(false, false, 0, hubError.getMessage());
             }
