@@ -265,9 +265,11 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
 
         if (version >= 393) {
             net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
-            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<>(
+            String json = com.github.retrooper.packetevents.util.adventure.AdventureSerializer.getGsonSerializer()
+                    .serialize(component);
+            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Optional<String>>(
                     2, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.OPTIONAL_COMPONENT,
-                    Optional.of(component)));
+                    Optional.of(json)));
 
             metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Boolean>(
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
