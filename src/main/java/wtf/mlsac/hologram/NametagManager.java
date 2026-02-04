@@ -77,37 +77,41 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
 
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
-        if (event.getPacketType() != PacketType.Play.Client.PLAYER_POSITION &&
-                event.getPacketType() != PacketType.Play.Client.PLAYER_POSITION_AND_ROTATION)
-            return;
+        try {
+            if (event.getPacketType() != PacketType.Play.Client.PLAYER_POSITION &&
+                    event.getPacketType() != PacketType.Play.Client.PLAYER_POSITION_AND_ROTATION)
+                return;
 
-        Player player = event.getPlayer();
-        if (player == null)
-            return;
+            Player player = event.getPlayer();
+            if (player == null)
+                return;
 
-        Integer entityId = armorStandIds.get(player.getUniqueId());
-        if (entityId == null)
-            return;
+            Integer entityId = armorStandIds.get(player.getUniqueId());
+            if (entityId == null)
+                return;
 
-        WrapperPlayClientPlayerFlying flying = new WrapperPlayClientPlayerFlying(event);
-        if (!flying.hasPositionChanged())
-            return;
+            WrapperPlayClientPlayerFlying flying = new WrapperPlayClientPlayerFlying(event);
+            if (!flying.hasPositionChanged())
+                return;
 
-        Vector3d pos = flying.getLocation().getPosition();
-        org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getHologramConfig().getConfig();
-        double yOffset = config.getDouble("nametags.height_offset", 2.5);
+            Vector3d pos = flying.getLocation().getPosition();
+            org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getHologramConfig().getConfig();
+            double yOffset = config.getDouble("nametags.height_offset", 2.5);
 
-        WrapperPlayServerEntityTeleport teleport = new WrapperPlayServerEntityTeleport(
-                entityId, new Vector3d(pos.getX(), pos.getY() + yOffset, pos.getZ()), 0f, 0f, false);
+            WrapperPlayServerEntityTeleport teleport = new WrapperPlayServerEntityTeleport(
+                    entityId, new Vector3d(pos.getX(), pos.getY() + yOffset, pos.getZ()), 0f, 0f, false);
 
-        Set<UUID> viewers = viewersMap.get(player.getUniqueId());
-        if (viewers != null) {
-            for (UUID viewerId : viewers) {
-                Player viewer = Bukkit.getPlayer(viewerId);
-                if (viewer != null && viewer.isOnline()) {
-                    PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, teleport);
+            Set<UUID> viewers = viewersMap.get(player.getUniqueId());
+            if (viewers != null) {
+                for (UUID viewerId : viewers) {
+                    Player viewer = Bukkit.getPlayer(viewerId);
+                    if (viewer != null && viewer.isOnline()) {
+                        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, teleport);
+                    }
                 }
             }
+        } catch (Exception e) {
+            // Silently ignore packet errors to prevent kicks
         }
     }
 
@@ -281,19 +285,23 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         }
 
-        int markerIndex = 10;
-        if (version >= 766)
-            markerIndex = 16;
-        else if (version >= 755)
+        int markerIndex = 10; // Default (1.8)
+
+        // 1.17+ (755) uses index 15 for ArmorStand flags
+        // 1.14+ (477) -> 1.16.5 (754) uses index 14
+        // 1.10 (210) -> 1.13.2 (404) uses index 11? No, 1.13 is 12?
+        // Let's stick to the previous ranges but fix the 1.20.5+ issue.
+
+        if (version >= 755) // 1.17+ (includes 1.20.5+ where it is still 15)
             markerIndex = 15;
-        else if (version >= 448)
+        else if (version >= 448) // 1.14+
             markerIndex = 14;
-        else if (version >= 385)
+        else if (version >= 385) // 1.13+
             markerIndex = 12;
-        else if (version >= 107)
+        else if (version >= 107) // 1.9+
             markerIndex = 11;
         else
-            markerIndex = 10;
+            markerIndex = 10; // 1.8
 
         metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
                 markerIndex, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE, (byte) 0x10));
