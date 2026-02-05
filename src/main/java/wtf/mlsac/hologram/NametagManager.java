@@ -260,14 +260,28 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
     private List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> getVersionedMetadata(
             Player viewer, String text) {
         List<com.github.retrooper.packetevents.protocol.entity.data.EntityData<?>> metadata = new ArrayList<>();
-        int version = PacketEvents.getAPI().getPlayerManager().getClientVersion(viewer).getProtocolVersion();
+        com.github.retrooper.packetevents.protocol.player.ClientVersion clientVersion = PacketEvents.getAPI()
+                .getPlayerManager().getClientVersion(viewer);
+        int version = clientVersion != null ? clientVersion.getProtocolVersion() : 770; // Default to 1.21.4
 
         metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
                 0, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE, (byte) 0x20));
 
         String colorized = ColorUtil.colorize(text);
 
-        if (version >= 393) {
+        if (version >= 766) {
+            // 1.20.5+ (protocol 766+) requires Component object, not JSON string
+            net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
+            metadata.add(
+                    new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Optional<net.kyori.adventure.text.Component>>(
+                            2,
+                            com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.OPTIONAL_ADV_COMPONENT,
+                            Optional.of(component)));
+
+            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Boolean>(
+                    3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
+        } else if (version >= 393) {
+            // 1.13+ to 1.20.4 uses JSON string for OPTIONAL_COMPONENT
             net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
             String json = com.github.retrooper.packetevents.util.adventure.AdventureSerializer.getGsonSerializer()
                     .serialize(component);
@@ -285,26 +299,34 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         }
 
-        int markerIndex = 10; // Default (1.8)
-
-        // 1.17+ (755) uses index 15 for ArmorStand flags
+        // ArmorStand flags byte index by version:
+        // For 1.20.5+ (766+), we skip the marker byte entirely to avoid protocol
+        // conflicts
+        // with server-side entity metadata that may have different type at these
+        // indices.
+        // The hologram will still work without the marker flag (0x10).
+        // 1.17+ (755) to 1.20.4 (765) uses index 15
         // 1.14+ (477) -> 1.16.5 (754) uses index 14
-        // 1.10 (210) -> 1.13.2 (404) uses index 11? No, 1.13 is 12?
-        // Let's stick to the previous ranges but fix the 1.20.5+ issue.
+        // 1.13+ uses index 12
+        // 1.9+ uses index 11
+        // 1.8 uses index 10
 
-        if (version >= 755) // 1.17+ (includes 1.20.5+ where it is still 15)
-            markerIndex = 15;
-        else if (version >= 448) // 1.14+
-            markerIndex = 14;
-        else if (version >= 385) // 1.13+
-            markerIndex = 12;
-        else if (version >= 107) // 1.9+
-            markerIndex = 11;
-        else
-            markerIndex = 10; // 1.8
-
-        metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
-                markerIndex, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE, (byte) 0x10));
+        if (version < 766) {
+            int markerIndex = 15; // Default for 1.17+
+            if (version < 755) {
+                if (version >= 448) // 1.14+
+                    markerIndex = 14;
+                else if (version >= 385) // 1.13+
+                    markerIndex = 12;
+                else if (version >= 107) // 1.9+
+                    markerIndex = 11;
+                else
+                    markerIndex = 10; // 1.8
+            }
+            metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Byte>(
+                    markerIndex, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE,
+                    (byte) 0x10));
+        }
 
         return metadata;
     }
