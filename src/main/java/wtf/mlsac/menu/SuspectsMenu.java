@@ -46,7 +46,6 @@ public class SuspectsMenu implements Listener {
         this.aiCheck = ((Main) plugin).getAiCheck();
         org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig().getConfig();
         String title = config.getString("gui.title", "&cMLSAC &8> &7Suspects");
-        // We force 54 for pagination
         this.inventory = Bukkit.createInventory(null, 54, ColorUtil.colorize(title));
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -59,7 +58,6 @@ public class SuspectsMenu implements Listener {
     private void updateInventory() {
         inventory.clear();
 
-        // Add loading indicator
         ItemStack loading = new ItemStack(Material.SUNFLOWER);
         ItemMeta loadingMeta = loading.getItemMeta();
         if (loadingMeta != null) {
@@ -70,64 +68,71 @@ public class SuspectsMenu implements Listener {
 
         SchedulerManager.getAdapter().runAsync(() -> {
             List<Player> onlinePlayers = new ArrayList<>(Bukkit.getOnlinePlayers());
-            List<Player> suspects = onlinePlayers.stream()
-                    .filter(p -> {
+
+            List<SuspectData> suspectDataList = onlinePlayers.stream()
+                    .map(p -> {
                         AIPlayerData data = aiCheck.getPlayerData(p.getUniqueId());
-                        return data != null && !data.getProbabilityHistory().isEmpty();
+                        if (data == null || data.getProbabilityHistory().isEmpty()) {
+                            return null;
+                        }
+                        return new SuspectData(
+                                p.getUniqueId(),
+                                p.getName(),
+                                data.getAverageProbability(),
+                                new ArrayList<>(data.getProbabilityHistory()));
                     })
-                    .sorted((p1, p2) -> {
-                        AIPlayerData d1 = aiCheck.getPlayerData(p1.getUniqueId());
-                        AIPlayerData d2 = aiCheck.getPlayerData(p2.getUniqueId());
-                        return Double.compare(d2.getAverageProbability(), d1.getAverageProbability());
-                    })
+                    .filter(d -> d != null)
+                    .sorted((d1, d2) -> Double.compare(d2.avgProbability, d1.avgProbability))
                     .collect(Collectors.toList());
 
-            int totalPages = (int) Math.ceil((double) suspects.size() / ITEMS_PER_PAGE);
-            if (page >= totalPages && totalPages > 0)
-                page = totalPages - 1;
-            if (page < 0)
-                page = 0;
-
-            int start = page * ITEMS_PER_PAGE;
-            int end = Math.min(start + ITEMS_PER_PAGE, suspects.size());
-
-            List<ItemStack> headItems = new ArrayList<>();
-            org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig().getConfig();
-
-            for (int i = start; i < end; i++) {
-                Player suspect = suspects.get(i);
-                headItems.add(createSuspectHead(suspect, config));
+            final int totalPages = (int) Math.ceil((double) suspectDataList.size() / ITEMS_PER_PAGE);
+            final int currentPage;
+            if (page >= totalPages && totalPages > 0) {
+                currentPage = totalPages - 1;
+            } else if (page < 0) {
+                currentPage = 0;
+            } else {
+                currentPage = page;
             }
+            page = currentPage;
+
+            int start = currentPage * ITEMS_PER_PAGE;
+            int end = Math.min(start + ITEMS_PER_PAGE, suspectDataList.size());
+
+            List<SuspectData> pageData = suspectDataList.subList(start, end);
+            final int finalTotalPages = totalPages;
+            final int finalEnd = end;
+            final int finalTotalSuspects = suspectDataList.size();
 
             SchedulerManager.getAdapter().runSync(() -> {
                 inventory.clear();
+                org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig().getConfig();
 
-                // Add heads
-                for (int i = 0; i < headItems.size(); i++) {
-                    inventory.setItem(i, headItems.get(i));
+                for (int i = 0; i < pageData.size(); i++) {
+                    SuspectData data = pageData.get(i);
+                    inventory.setItem(i, createSuspectHeadFromData(data, config));
                 }
 
-                // Add navigation buttons from config
-                if (page > 0) {
+                if (currentPage > 0) {
                     Material prevMat = Material.valueOf(config.getString("gui.items.previous_page.material", "ARROW"));
                     String prevName = config.getString("gui.items.previous_page.name", "&ePrevious Page (&f{PAGE}&e)");
-                    inventory.setItem(45, createButtonItem(prevMat, prevName.replace("{PAGE}", String.valueOf(page))));
+                    inventory.setItem(45,
+                            createButtonItem(prevMat, prevName.replace("{PAGE}", String.valueOf(currentPage))));
                 }
 
                 Material infoMat = Material.valueOf(config.getString("gui.items.page_info.material", "PAPER"));
                 String infoName = config.getString("gui.items.page_info.name", "&bPage &f{CURRENT} &7/ &f{TOTAL}");
                 inventory.setItem(49, createButtonItem(infoMat, infoName
-                        .replace("{CURRENT}", String.valueOf(page + 1))
-                        .replace("{TOTAL}", String.valueOf(Math.max(1, totalPages)))));
+                        .replace("{CURRENT}", String.valueOf(currentPage + 1))
+                        .replace("{TOTAL}", String.valueOf(Math.max(1, finalTotalPages)))));
 
-                if (end < suspects.size()) {
+                if (finalEnd < finalTotalSuspects) {
                     Material nextMat = Material.valueOf(config.getString("gui.items.next_page.material", "ARROW"));
                     String nextName = config.getString("gui.items.next_page.name", "&eNext Page (&f{PAGE}&e)");
                     inventory.setItem(53,
-                            createButtonItem(nextMat, nextName.replace("{PAGE}", String.valueOf(page + 2))));
+                            createButtonItem(nextMat, nextName.replace("{PAGE}", String.valueOf(currentPage + 2))));
                 }
 
-                // Fill bottom bar with filler from config
                 Material fillerMat = Material
                         .valueOf(config.getString("gui.items.filler.material", "GRAY_STAINED_GLASS_PANE"));
                 String fillerName = config.getString("gui.items.filler.name", " ");
@@ -141,18 +146,34 @@ public class SuspectsMenu implements Listener {
         });
     }
 
-    private ItemStack createSuspectHead(Player suspect, org.bukkit.configuration.file.FileConfiguration config) {
-        AIPlayerData data = aiCheck.getPlayerData(suspect.getUniqueId());
-        double avg = data.getAverageProbability();
-        List<Double> history = data.getProbabilityHistory();
+    private static class SuspectData {
+        final UUID uuid;
+        final String name;
+        final double avgProbability;
+        final List<Double> history;
 
+        SuspectData(UUID uuid, String name, double avgProbability, List<Double> history) {
+            this.uuid = uuid;
+            this.name = name;
+            this.avgProbability = avgProbability;
+            this.history = history;
+        }
+    }
+
+    private ItemStack createSuspectHeadFromData(SuspectData data,
+            org.bukkit.configuration.file.FileConfiguration config) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) head.getItemMeta();
         if (meta != null) {
-            meta.setOwningPlayer(suspect);
+            Player suspect = Bukkit.getPlayer(data.uuid);
+            if (suspect != null && suspect.isOnline()) {
+                meta.setOwningPlayer(suspect);
+            } else {
+                meta.setOwningPlayer(Bukkit.getOfflinePlayer(data.uuid));
+            }
 
             String nameFormat = config.getString("gui.items.suspect_head.name", "&c{PLAYER}");
-            meta.setDisplayName(ColorUtil.colorize(nameFormat.replace("{PLAYER}", suspect.getName())));
+            meta.setDisplayName(ColorUtil.colorize(nameFormat.replace("{PLAYER}", data.name)));
 
             List<String> loreFormat = config.getStringList("gui.items.suspect_head.lore");
             if (loreFormat.isEmpty()) {
@@ -168,14 +189,14 @@ public class SuspectsMenu implements Listener {
 
             List<String> lore = new ArrayList<>();
             StringBuilder historyStr = new StringBuilder();
-            for (Double val : history) {
+            for (Double val : data.history) {
                 historyStr.append(getColorInfo(val)).append(" ");
             }
 
             for (String line : loreFormat) {
                 lore.add(ColorUtil.colorize(line
-                        .replace("{AVG_PROB}", getColorInfo(avg))
-                        .replace("{HISTORY_SIZE}", String.valueOf(history.size()))
+                        .replace("{AVG_PROB}", getColorInfo(data.avgProbability))
+                        .replace("{HISTORY_SIZE}", String.valueOf(data.history.size()))
                         .replace("{HISTORY}", historyStr.toString().trim())));
             }
 
@@ -231,7 +252,6 @@ public class SuspectsMenu implements Listener {
         if (event.getSlot() == 53) {
             Material nextMat = Material.valueOf(config.getString("gui.items.next_page.material", "ARROW"));
             if (item.getType() == nextMat) {
-                // We don't have totalPages here, but updateInventory handles bounds.
                 page++;
                 updateInventory();
             }

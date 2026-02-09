@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.penalty.handlers;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -31,14 +31,17 @@ import wtf.mlsac.penalty.ActionType;
 import wtf.mlsac.penalty.BanAnimation;
 import wtf.mlsac.penalty.PenaltyContext;
 import wtf.mlsac.scheduler.SchedulerManager;
+
 public class BanHandler implements ActionHandler {
     private final JavaPlugin plugin;
     private final BanAnimation animation;
     private boolean animationEnabled = true;
+
     public BanHandler(JavaPlugin plugin) {
         this.plugin = plugin;
         this.animation = new BanAnimation(plugin);
     }
+
     @Override
     public void handle(String command, PenaltyContext context) {
         if (command == null || command.isEmpty()) {
@@ -56,18 +59,23 @@ public class BanHandler implements ActionHandler {
             });
         }
     }
+
     public void setAnimationEnabled(boolean enabled) {
         this.animationEnabled = enabled;
     }
+
     public boolean isAnimationEnabled() {
         return animationEnabled;
     }
+
     public BanAnimation getAnimation() {
         return animation;
     }
+
     public void shutdown() {
         animation.shutdown();
     }
+
     @Override
     public ActionType getActionType() {
         return ActionType.BAN;

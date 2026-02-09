@@ -92,7 +92,11 @@ public class AlertManager {
     }
 
     public void sendAlert(String suspectName, double probability, double buffer) {
-        String message = formatAlertMessage(suspectName, probability, buffer);
+        sendAlert(suspectName, probability, buffer, null);
+    }
+
+    public void sendAlert(String suspectName, double probability, double buffer, String modelName) {
+        String message = formatAlertMessage(suspectName, probability, buffer, modelName);
         scheduler.runSync(() -> {
             for (UUID uuid : playersWithAlerts) {
                 Player player = Bukkit.getPlayer(uuid);
@@ -107,7 +111,11 @@ public class AlertManager {
     }
 
     public void sendAlert(String suspectName, double probability, double buffer, int vl) {
-        String message = formatAlertMessage(suspectName, probability, buffer, vl);
+        sendAlert(suspectName, probability, buffer, vl, null);
+    }
+
+    public void sendAlert(String suspectName, double probability, double buffer, int vl, String modelName) {
+        String message = formatAlertMessage(suspectName, probability, buffer, vl, modelName);
         scheduler.runSync(() -> {
             for (UUID uuid : playersWithAlerts) {
                 Player player = Bukkit.getPlayer(uuid);
@@ -121,13 +129,17 @@ public class AlertManager {
         });
     }
 
-    private String formatAlertMessage(String suspectName, double probability, double buffer) {
+    private String formatAlertMessage(String suspectName, double probability, double buffer, String modelName) {
         String template = messagesConfig.getMessage("alert-format", suspectName, probability, buffer, 0);
+        String modelDisplay = modelName != null ? config.getModelDisplayName(modelName) : "Unknown";
+        template = template.replace("{MODEL}", modelDisplay).replace("<model>", modelDisplay);
         return getPrefix() + ColorUtil.colorize(template);
     }
 
-    private String formatAlertMessage(String suspectName, double probability, double buffer, int vl) {
+    private String formatAlertMessage(String suspectName, double probability, double buffer, int vl, String modelName) {
         String template = messagesConfig.getMessage("alert-format-vl", suspectName, probability, buffer, vl);
+        String modelDisplay = modelName != null ? config.getModelDisplayName(modelName) : "Unknown";
+        template = template.replace("{MODEL}", modelDisplay).replace("<model>", modelDisplay);
         return getPrefix() + ColorUtil.colorize(template);
     }
 

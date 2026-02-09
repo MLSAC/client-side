@@ -95,7 +95,9 @@ public class SignalRClient implements IAIClient {
                 }
 
                 if (this.sessionManager == null) {
-                    this.sessionManager = new SignalRSessionManager(serverAddress, endpointConfig, logger, debug);
+                    String pluginVersion = plugin.getDescription().getVersion();
+                    this.sessionManager = new SignalRSessionManager(serverAddress, endpointConfig, logger, debug,
+                            pluginVersion);
                     sessionManager.initialize();
                     sessionManager.setOnDisconnectedCallback(this::handleDisconnection);
                 }
@@ -142,7 +144,7 @@ public class SignalRClient implements IAIClient {
                 connected = false;
                 return false;
             }
-        });
+        }, java.util.concurrent.ForkJoinPool.commonPool()); // Explicitly use ForkJoinPool to ensure async execution
 
         return connectionFuture;
     }
@@ -300,75 +302,88 @@ public class SignalRClient implements IAIClient {
         });
     }
 
-    public CompletableFuture<AIResponse> predict(byte[] playerData, String playerUuid) {
+    @Override
+    public io.reactivex.rxjava3.core.Observable<AIResponse> predict(byte[] playerData, String playerUuid,
+            String playerName) {
         if (!isConnected()) {
-            return CompletableFuture.failedFuture(
+            return io.reactivex.rxjava3.core.Observable.error(
                     new IllegalStateException("Not connected to SignalR server"));
         }
         if (reportStatsScheduler != null && reportStatsScheduler.isLimitExceeded()) {
-            return CompletableFuture.failedFuture(
+            return io.reactivex.rxjava3.core.Observable.error(
                     new IllegalStateException("Online limit exceeded, Predict blocked"));
         }
-        return sessionManager.predict(playerData, playerUuid)
-                .thenCompose(result -> {
+        return sessionManager.predict(playerData, playerUuid, playerName)
+                .concatMap(result -> {
                     if (result.isSuccess()) {
-                        return CompletableFuture.completedFuture(
-                                new AIResponse(result.getProbability()));
+                        return io.reactivex.rxjava3.core.Observable.just(
+                                new AIResponse(result.getProbability(), null, result.getModel()));
                     }
                     String errorCode = result.getErrorCode();
                     if (HubErrorParser.requiresReportStats(errorCode)) {
-                        logger.warning("[SignalR] Predict failed: " + errorCode + ", calling ReportStats...");
-                        return handleStatsRequiredAndRetry(playerData, playerUuid);
+                        if (debug) {
+                            logger.warning("[SignalR] Predict failed: " + errorCode + ", calling ReportStats...");
+                        }
+                        return handleStatsRequiredAndRetry(playerData, playerUuid, playerName);
                     }
                     if (HubErrorParser.LIMIT_EXCEEDED.equals(errorCode)) {
-                        logger.warning("[SignalR] Predict failed: Online limit exceeded");
+                        if (debug) {
+                            logger.warning("[SignalR] Predict failed: Online limit exceeded");
+                        }
                         if (reportStatsScheduler != null) {
                             reportStatsScheduler.setLimitExceeded(true);
                         }
-                        return CompletableFuture.failedFuture(
+                        return io.reactivex.rxjava3.core.Observable.error(
                                 new RuntimeException("Online limit exceeded"));
                     }
                     if (HubErrorParser.NOT_AUTHENTICATED.equals(errorCode)) {
-                        logger.warning("[SignalR] Session expired during prediction, attempting reconnect");
-                        return handleUnauthenticatedAndRetry(playerData, playerUuid);
+                        if (debug) {
+                            logger.warning("[SignalR] Session expired during prediction, attempting reconnect");
+                        }
+                        return handleUnauthenticatedAndRetry(playerData, playerUuid, playerName);
                     }
-                    return CompletableFuture.failedFuture(
+                    return io.reactivex.rxjava3.core.Observable.error(
                             new RuntimeException(errorCode + ": " + result.getErrorMessage()));
                 });
     }
 
-    private CompletableFuture<AIResponse> handleStatsRequiredAndRetry(byte[] playerData, String playerUuid) {
+    private io.reactivex.rxjava3.core.Observable<AIResponse> handleStatsRequiredAndRetry(byte[] playerData,
+            String playerUuid,
+            String playerName) {
         if (reportStatsScheduler == null) {
-            return CompletableFuture.failedFuture(
+            return io.reactivex.rxjava3.core.Observable.error(
                     new RuntimeException("ReportStats scheduler not initialized"));
         }
-        return reportStatsScheduler.reportNow()
-                .thenCompose(statsResult -> {
+        // Convert CompletableFuture to Observable
+        return io.reactivex.rxjava3.core.Observable.fromFuture(reportStatsScheduler.reportNow())
+                .flatMap(statsResult -> {
                     if (!statsResult.isSuccess()) {
-                        return CompletableFuture.failedFuture(
+                        return io.reactivex.rxjava3.core.Observable.error(
                                 new RuntimeException("ReportStats failed: " + statsResult.getError()));
                     }
                     if (statsResult.isLimitExceeded()) {
-                        return CompletableFuture.failedFuture(
+                        return io.reactivex.rxjava3.core.Observable.error(
                                 new RuntimeException("Online limit exceeded after ReportStats"));
                     }
-                    return sessionManager.predict(playerData, playerUuid)
-                            .thenApply(result -> {
+                    return sessionManager.predict(playerData, playerUuid, playerName)
+                            .map(result -> {
                                 if (result.isSuccess()) {
-                                    return new AIResponse(result.getProbability());
+                                    return new AIResponse(result.getProbability(), null, result.getModel());
                                 }
                                 throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
                             });
                 });
     }
 
-    private CompletableFuture<AIResponse> handleUnauthenticatedAndRetry(byte[] playerData, String playerUuid) {
-        return sessionManager.createSession(apiKey, pluginHash)
-                .thenCompose(sessionId -> {
-                    return sessionManager.predict(playerData, playerUuid)
-                            .thenApply(result -> {
+    private io.reactivex.rxjava3.core.Observable<AIResponse> handleUnauthenticatedAndRetry(byte[] playerData,
+            String playerUuid,
+            String playerName) {
+        return io.reactivex.rxjava3.core.Observable.fromFuture(sessionManager.createSession(apiKey, pluginHash))
+                .flatMap(sessionId -> {
+                    return sessionManager.predict(playerData, playerUuid, playerName)
+                            .map(result -> {
                                 if (result.isSuccess()) {
-                                    return new AIResponse(result.getProbability());
+                                    return new AIResponse(result.getProbability(), null, result.getModel());
                                 }
                                 throw new RuntimeException(result.getErrorCode() + ": " + result.getErrorMessage());
                             });

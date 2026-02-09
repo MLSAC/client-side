@@ -21,8 +21,8 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.listeners;
+
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
@@ -30,14 +30,17 @@ import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPl
 import wtf.mlsac.checks.AICheck;
 import wtf.mlsac.session.ISessionManager;
 import org.bukkit.entity.Player;
+
 public class RotationListener extends PacketListenerAbstract {
     private final ISessionManager sessionManager;
     private final AICheck aiCheck;
+
     public RotationListener(ISessionManager sessionManager, AICheck aiCheck) {
         super(PacketListenerPriority.NORMAL);
         this.sessionManager = sessionManager;
         this.aiCheck = aiCheck;
     }
+
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
         try {
@@ -61,7 +64,6 @@ public class RotationListener extends PacketListenerAbstract {
                 sessionManager.onTick(player, yaw, pitch);
             }
         } catch (Exception e) {
-            // Silently ignore packet errors to prevent kicks
         }
     }
 }

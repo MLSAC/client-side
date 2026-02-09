@@ -101,7 +101,6 @@ public class HitListener extends PacketListenerAbstract {
             }
             sessionManager.onAttack(attacker);
         } catch (Exception e) {
-            // Silently ignore packet errors to prevent kicks
         }
     }
 

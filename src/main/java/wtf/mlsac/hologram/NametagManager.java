@@ -111,7 +111,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
                 }
             }
         } catch (Exception e) {
-            // Silently ignore packet errors to prevent kicks
         }
     }
 
@@ -270,7 +269,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
         String colorized = ColorUtil.colorize(text);
 
         if (version >= 766) {
-            // 1.20.5+ (protocol 766+) requires Component object, not JSON string
             net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
             metadata.add(
                     new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Optional<net.kyori.adventure.text.Component>>(
@@ -281,7 +279,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
             metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Boolean>(
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         } else if (version >= 393) {
-            // 1.13+ to 1.20.4 uses JSON string for OPTIONAL_COMPONENT
             net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(colorized);
             String json = com.github.retrooper.packetevents.util.adventure.AdventureSerializer.getGsonSerializer()
                     .serialize(component);
@@ -298,18 +295,6 @@ public class NametagManager extends PacketListenerAbstract implements Listener {
             metadata.add(new com.github.retrooper.packetevents.protocol.entity.data.EntityData<Boolean>(
                     3, com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN, true));
         }
-
-        // ArmorStand flags byte index by version:
-        // For 1.20.5+ (766+), we skip the marker byte entirely to avoid protocol
-        // conflicts
-        // with server-side entity metadata that may have different type at these
-        // indices.
-        // The hologram will still work without the marker flag (0x10).
-        // 1.17+ (755) to 1.20.4 (765) uses index 15
-        // 1.14+ (477) -> 1.16.5 (754) uses index 14
-        // 1.13+ uses index 12
-        // 1.9+ uses index 11
-        // 1.8 uses index 10
 
         if (version < 766) {
             int markerIndex = 15; // Default for 1.17+

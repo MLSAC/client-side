@@ -21,26 +21,27 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr.dto;
+
 public class ReportStatsResponse {
     public boolean limitExceeded;
     public int maxOnline;
-    public ReportStatsResponse() {}
-    
-    // Геттеры для правильной десериализации
+
+    public ReportStatsResponse() {
+    }
+
     public boolean isLimitExceeded() {
         return limitExceeded;
     }
-    
+
     public void setLimitExceeded(boolean limitExceeded) {
         this.limitExceeded = limitExceeded;
     }
-    
+
     public int getMaxOnline() {
         return maxOnline;
     }
-    
+
     public void setMaxOnline(int maxOnline) {
         this.maxOnline = maxOnline;
     }

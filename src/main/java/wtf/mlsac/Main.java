@@ -74,26 +74,42 @@ public final class Main extends JavaPlugin {
     @Override
     public void onLoad() {
         VersionAdapter.init(getLogger());
-        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
-        PacketEvents.getAPI().getSettings()
-                .reEncodeByDefault(false)
-                .checkForUpdates(false)
-                .bStats(false)
-                .debug(false);
-        PacketEvents.getAPI().load();
+        // PacketEvents loading moved to onEnable to avoid ClassLoader issues with
+        // PlugMan
     }
 
     @Override
     public void onEnable() {
         try {
+            SchedulerManager.reset();
             SchedulerManager.initialize(this);
             getLogger().info("SchedulerManager initialized for " + SchedulerManager.getServerType());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             getLogger().severe("Failed to initialize SchedulerManager: " + e.getMessage());
+            e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        PacketEvents.getAPI().init();
+
+        try {
+            // Check if API is already set (reloading)
+            if (PacketEvents.getAPI() == null || !PacketEvents.getAPI().isLoaded()) {
+                PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
+                PacketEvents.getAPI().getSettings()
+                        .reEncodeByDefault(false)
+                        .checkForUpdates(false)
+                        .bStats(false)
+                        .debug(false);
+                PacketEvents.getAPI().load();
+            }
+
+            if (!PacketEvents.getAPI().isInitialized()) {
+                PacketEvents.getAPI().init();
+            }
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize PacketEvents: " + e.getMessage());
+            e.printStackTrace();
+        }
         VersionAdapter.get().logCompatibilityInfo();
         saveDefaultConfig();
         this.config = new Config(this, getLogger());
@@ -197,7 +213,10 @@ public final class Main extends JavaPlugin {
                 getLogger().warning("Error shutting down SignalR client: " + e.getMessage());
             }
         }
-        PacketEvents.getAPI().terminate();
+        if (PacketEvents.getAPI() != null && PacketEvents.getAPI().isInitialized()) {
+            PacketEvents.getAPI().terminate();
+        }
+        SchedulerManager.reset();
         getLogger().info("MLSAC disabled successfully!");
     }
 

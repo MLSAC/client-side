@@ -21,33 +21,50 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.server;
+
 public class AIResponse {
     private final double probability;
     private final String error;
+    private final String model;
+
     public AIResponse(double probability) {
-        this(probability, null);
+        this(probability, null, null);
     }
+
     public AIResponse(double probability, String error) {
+        this(probability, error, null);
+    }
+
+    public AIResponse(double probability, String error, String model) {
         this.probability = probability;
         this.error = error;
+        this.model = model;
     }
+
     public double getProbability() {
         return probability;
     }
+
     public String getError() {
         return error;
     }
+
+    public String getModel() {
+        return model != null ? model : "unknown";
+    }
+
     public boolean hasError() {
         return error != null && !error.isEmpty();
     }
+
     public static AIResponse fromJson(String json) {
         if (json == null || json.isEmpty()) {
             return null;
         }
         try {
             String trimmed = json.trim();
+
             int errorIndex = trimmed.indexOf("\"error\"");
             if (errorIndex != -1) {
                 int colonIndex = trimmed.indexOf(':', errorIndex);
@@ -62,6 +79,7 @@ public class AIResponse {
                     }
                 }
             }
+
             int probIndex = trimmed.indexOf("\"probability\"");
             if (probIndex == -1) {
                 return null;
@@ -84,25 +102,47 @@ public class AIResponse {
             }
             String probStr = trimmed.substring(start, end);
             double probability = Double.parseDouble(probStr);
-            return new AIResponse(probability);
+
+            String modelName = null;
+            int modelIndex = trimmed.indexOf("\"model\"");
+            if (modelIndex != -1) {
+                int modelColonIndex = trimmed.indexOf(':', modelIndex);
+                if (modelColonIndex != -1) {
+                    int modelStart = trimmed.indexOf('"', modelColonIndex + 1);
+                    if (modelStart != -1) {
+                        int modelEnd = trimmed.indexOf('"', modelStart + 1);
+                        if (modelEnd != -1) {
+                            modelName = trimmed.substring(modelStart + 1, modelEnd);
+                        }
+                    }
+                }
+            }
+
+            return new AIResponse(probability, null, modelName);
         } catch (Exception e) {
             return null;
         }
     }
+
     public String toJson() {
         return "{\"probability\":" + probability + "}";
     }
+
     @Override
     public String toString() {
         return "AIResponse{probability=" + probability + "}";
     }
+
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
+        if (this == obj)
+            return true;
+        if (obj == null || getClass() != obj.getClass())
+            return false;
         AIResponse that = (AIResponse) obj;
         return Double.compare(that.probability, probability) == 0;
     }
+
     @Override
     public int hashCode() {
         long temp = Double.doubleToLongBits(probability);

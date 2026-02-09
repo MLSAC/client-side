@@ -40,6 +40,7 @@ public class SignalRSessionManager {
     private final SignalREndpointConfig endpointConfig;
     private final String hubUrl;
     private final boolean debug;
+    private final String pluginVersion;
     private HubConnection hubConnection;
     private volatile String sessionId;
     private volatile boolean sessionValid;
@@ -47,12 +48,13 @@ public class SignalRSessionManager {
     private java.util.function.Consumer<Throwable> onDisconnectedCallback;
 
     public SignalRSessionManager(String serverAddress, SignalREndpointConfig endpointConfig, Logger logger,
-            boolean debug) {
+            boolean debug, String pluginVersion) {
         this.logger = logger;
         this.endpointConfig = endpointConfig;
         this.hubUrl = endpointConfig.getHubUrl(serverAddress);
         this.sessionValid = false;
         this.debug = debug;
+        this.pluginVersion = pluginVersion;
     }
 
     public void setOnDisconnectedCallback(java.util.function.Consumer<Throwable> callback) {
@@ -102,9 +104,10 @@ public class SignalRSessionManager {
                 String methodName = endpointConfig.getMethodName("connect");
                 if (debug) {
                     logger.info("[SignalR] Calling " + methodName + " with api_key=" +
-                            apiKey.substring(0, Math.min(8, apiKey.length())) + "..., plugin_hash=" + pluginHash);
+                            apiKey.substring(0, Math.min(8, apiKey.length())) + "..., plugin_hash=" + pluginHash +
+                            ", plugin_version=" + pluginVersion);
                 }
-                ConnectRequest request = new ConnectRequest(apiKey, pluginHash);
+                ConnectRequest request = new ConnectRequest(apiKey, pluginHash, pluginVersion);
                 ConnectResponse response = hubConnection.invoke(ConnectResponse.class, methodName, request)
                         .blockingGet();
                 if (response == null || response.sessionId == null || response.sessionId.isEmpty()) {
@@ -156,15 +159,18 @@ public class SignalRSessionManager {
 
     public CompletableFuture<ReportStatsResult> reportStats(int onlinePlayers) {
         if (!isSessionValid()) {
-            logger.warning("[SignalR] Cannot call ReportStats - no active session");
+            if (debug) {
+                logger.warning("[SignalR] Cannot call ReportStats - no active session");
+            }
             return CompletableFuture.completedFuture(
                     new ReportStatsResult(false, false, 0, "No active session"));
         }
 
-        // Проверка состояния подключения
         HubConnectionState state = hubConnection.getConnectionState();
         if (state != HubConnectionState.CONNECTED) {
-            logger.severe("[SignalR] Cannot call ReportStats - not connected! State: " + state);
+            if (debug) {
+                logger.severe("[SignalR] Cannot call ReportStats - not connected! State: " + state);
+            }
             return CompletableFuture.completedFuture(
                     new ReportStatsResult(false, false, 0, "Not connected, state: " + state));
         }
@@ -174,11 +180,9 @@ public class SignalRSessionManager {
                 String methodName = endpointConfig.getMethodName("reportStats");
                 ReportStatsRequest request = new ReportStatsRequest(onlinePlayers);
 
-                logger.info("[SignalR] Connection state OK, calling ReportStats...");
-                logger.info("[SignalR] Preparing to call " + methodName + " with onlinePlayers=" + onlinePlayers);
-
-                // Логирование JSON для отладки
                 if (debug) {
+                    logger.info("[SignalR] Connection state OK, calling ReportStats...");
+                    logger.info("[SignalR] Preparing to call " + methodName + " with onlinePlayers=" + onlinePlayers);
                     try {
                         com.google.gson.Gson gson = new com.google.gson.Gson();
                         String json = gson.toJson(request);
@@ -186,11 +190,9 @@ public class SignalRSessionManager {
                     } catch (Exception jsonEx) {
                         logger.warning("[SignalR] Failed to serialize request to JSON: " + jsonEx.getMessage());
                     }
+                    logger.info("[SignalR] ReportStats invoked, waiting for response...");
                 }
 
-                logger.info("[SignalR] ReportStats invoked, waiting for response...");
-
-                // Вызов с timeout через get() с таймаутом
                 ReportStatsResponse response;
                 try {
                     response = hubConnection.invoke(ReportStatsResponse.class, methodName, request)
@@ -198,12 +200,11 @@ public class SignalRSessionManager {
                             .toFuture()
                             .get(5, java.util.concurrent.TimeUnit.SECONDS);
                 } catch (java.util.concurrent.TimeoutException timeoutEx) {
-                    logger.severe("[SignalR] ReportStats timeout after 5 seconds");
-                    logger.severe("[SignalR] Exception type: " + timeoutEx.getClass().getName());
-                    logger.severe("[SignalR] Exception message: " + timeoutEx.getMessage());
+                    if (debug) {
+                        logger.severe("[SignalR] ReportStats timeout after 5 seconds");
+                    }
                     return new ReportStatsResult(false, false, 0, "Timeout after 5 seconds");
                 } catch (java.util.concurrent.ExecutionException execEx) {
-                    // Разворачиваем ExecutionException для получения реальной причины
                     Throwable cause = execEx.getCause();
                     if (cause != null) {
                         throw cause;
@@ -211,22 +212,23 @@ public class SignalRSessionManager {
                     throw execEx;
                 }
 
-                logger.info("[SignalR] ReportStats completed successfully!");
-
-                boolean limitExceeded = response != null && response.limitExceeded;
-                int maxOnline = response != null ? response.maxOnline : 0;
-
                 if (debug) {
+                    logger.info("[SignalR] ReportStats completed successfully!");
+                    boolean limitExceeded = response != null && response.limitExceeded;
+                    int maxOnline = response != null ? response.maxOnline : 0;
                     logger.info("[SignalR] ReportStats response: limitExceeded=" + limitExceeded +
                             ", maxOnline=" + maxOnline);
                 }
 
+                boolean limitExceeded = response != null && response.limitExceeded;
+                int maxOnline = response != null ? response.maxOnline : 0;
                 return new ReportStatsResult(true, limitExceeded, maxOnline, null);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.severe("[SignalR] ReportStats interrupted");
-                logger.severe("[SignalR] Exception type: " + e.getClass().getName());
+                if (debug) {
+                    logger.severe("[SignalR] ReportStats interrupted: " + e.getMessage());
+                }
                 return new ReportStatsResult(false, false, 0, "Interrupted");
 
             } catch (Throwable e) {
@@ -234,51 +236,58 @@ public class SignalRSessionManager {
 
                 if (HubErrorParser.NOT_AUTHENTICATED.equals(hubError.getCode())) {
                     this.sessionValid = false;
-                    logger.warning("[SignalR] ReportStats failed: Session invalidated (NOT_AUTHENTICATED)");
+                    if (debug) {
+                        logger.warning("[SignalR] ReportStats failed: Session invalidated (NOT_AUTHENTICATED)");
+                    }
                     return new ReportStatsResult(false, false, 0, hubError.getMessage());
                 }
 
-                logger.severe("[SignalR] ReportStats failed with exception");
-                logger.severe("[SignalR] Exception type: " + e.getClass().getName());
-                logger.severe("[SignalR] Exception message: " + e.getMessage());
-
-                logger.severe("[SignalR] Parsed error code: " + hubError.getCode());
-                logger.severe("[SignalR] Parsed error message: " + hubError.getMessage());
+                if (debug) {
+                    logger.severe(
+                            "[SignalR] ReportStats failed: " + hubError.getCode() + " - " + hubError.getMessage());
+                }
 
                 return new ReportStatsResult(false, false, 0, hubError.getMessage());
             }
         });
     }
 
-    public CompletableFuture<PredictResult> predict(byte[] playerData, String playerUuid) {
+    public io.reactivex.rxjava3.core.Observable<PredictResult> predict(byte[] playerData, String playerUuid,
+            String playerName) {
         if (!isSessionValid()) {
-            return CompletableFuture.completedFuture(
-                    new PredictResult(false, 0, 0, "NOT_AUTHENTICATED", "No active session"));
+            return io.reactivex.rxjava3.core.Observable.just(
+                    new PredictResult(false, 0, 0, "NOT_AUTHENTICATED", "No active session", null));
         }
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                String methodName = endpointConfig.getMethodName("predict");
-                PredictRequest request = new PredictRequest(playerData, playerUuid);
-                PredictResponse response = hubConnection.invoke(PredictResponse.class, methodName, request)
-                        .blockingGet();
-                if (response == null) {
-                    return new PredictResult(false, 0, 0, "INVALID_RESPONSE", "Null response from server");
-                }
-                if (Float.isNaN(response.probability) || Float.isInfinite(response.probability)) {
-                    return new PredictResult(false, 0, 0, "INVALID_DATA",
-                            "Server returned invalid probability: " + response.probability);
-                }
-                float probability = Math.max(0.0f, Math.min(1.0f, response.probability));
-                return new PredictResult(true, probability, response.inferenceTimeMs, null, null);
-            } catch (Exception e) {
-                HubErrorParser.HubError hubError = HubErrorParser.parse(e.getMessage());
-                String errorCode = hubError.getCode();
-                if (HubErrorParser.NOT_AUTHENTICATED.equals(errorCode)) {
-                    this.sessionValid = false;
-                }
-                return new PredictResult(false, 0, 0, errorCode, hubError.getMessage());
-            }
-        });
+
+        String methodName = "predictStream";
+        PredictRequest request = new PredictRequest(playerData, playerUuid, playerName);
+
+        return hubConnection.stream(PredictResponse.class, methodName, request)
+                .map(response -> {
+                    if (response == null) {
+                        return new PredictResult(false, 0, 0, "INVALID_RESPONSE", "Null response from server", null);
+                    }
+                    if (debug) {
+                        logger.info("[SignalR] Predict response received - probability: " + response.probability +
+                                ", inferenceTimeMs: " + response.inferenceTimeMs +
+                                ", model (raw): '" + response.model + "'");
+                    }
+                    if (Float.isNaN(response.probability) || Float.isInfinite(response.probability)) {
+                        return new PredictResult(false, 0, 0, "INVALID_DATA",
+                                "Server returned invalid probability: " + response.probability, null);
+                    }
+                    float probability = Math.max(0.0f, Math.min(1.0f, response.probability));
+                    String modelName = response.model;
+                    return new PredictResult(true, probability, response.inferenceTimeMs, null, null, modelName);
+                })
+                .onErrorReturn(throwable -> {
+                    HubErrorParser.HubError hubError = HubErrorParser.parse(throwable.getMessage());
+                    String errorCode = hubError.getCode();
+                    if (HubErrorParser.NOT_AUTHENTICATED.equals(errorCode)) {
+                        this.sessionValid = false;
+                    }
+                    return new PredictResult(false, 0, 0, errorCode, hubError.getMessage(), null);
+                });
     }
 
     public CompletableFuture<Void> closeSession() {
@@ -380,14 +389,16 @@ public class SignalRSessionManager {
         private final long inferenceTimeMs;
         private final String errorCode;
         private final String errorMessage;
+        private final String model;
 
         public PredictResult(boolean success, float probability, long inferenceTimeMs,
-                String errorCode, String errorMessage) {
+                String errorCode, String errorMessage, String model) {
             this.success = success;
             this.probability = probability;
             this.inferenceTimeMs = inferenceTimeMs;
             this.errorCode = errorCode;
             this.errorMessage = errorMessage;
+            this.model = model;
         }
 
         public boolean isSuccess() {
@@ -408,6 +419,10 @@ public class SignalRSessionManager {
 
         public String getErrorMessage() {
             return errorMessage;
+        }
+
+        public String getModel() {
+            return model;
         }
     }
 

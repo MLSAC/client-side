@@ -179,12 +179,6 @@ public class AimProcessor {
         }
         double f = Math.cbrt(modeY / 1.2);
         double sensitivity = (f - 0.2) / 0.6;
-        return (int) Math.round(sensitivity * 200); // Usually 0-200% in Minecraft settings, or 0-100% depending on
-                                                    // interpretation.
-        // Minecraft internal sensitivity is 0.0-1.0.
-        // 100% in menu is 0.5 internal. 200% is 1.0 internal.
-        // Actually, let's just return the % value (0-200).
-        // If sens is 1.0 (Hyper Speed), (1.0 * 0.6 + 0.2) = 0.8. 0.8^3 = 0.512. * 1.2 =
-        // 0.6144.
+        return (int) Math.round(sensitivity * 200);
     }
 }

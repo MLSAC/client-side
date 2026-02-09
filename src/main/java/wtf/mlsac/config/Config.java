@@ -73,6 +73,8 @@ public class Config {
     private final int foliaThreadPoolSize;
     private final boolean foliaEntitySchedulerEnabled;
     private final boolean foliaRegionSchedulerEnabled;
+    private final Map<String, String> modelNames;
+    private final Map<String, Boolean> modelOnlyAlert;
     public static final boolean DEFAULT_DEBUG = false;
     public static final String DEFAULT_OUTPUT_DIRECTORY = "plugins/MLSAC/data";
     public static final int PRE_HIT_TICKS = 5;
@@ -159,6 +161,8 @@ public class Config {
         this.foliaThreadPoolSize = DEFAULT_FOLIA_THREAD_POOL_SIZE;
         this.foliaEntitySchedulerEnabled = DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED;
         this.foliaRegionSchedulerEnabled = DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED;
+        this.modelNames = new HashMap<>();
+        this.modelOnlyAlert = new HashMap<>();
     }
 
     private static Set<String> createDefaultCheatReasons() {
@@ -259,6 +263,27 @@ public class Config {
                 DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED);
         this.foliaRegionSchedulerEnabled = config.getBoolean("folia.region-scheduler.enabled",
                 DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED);
+
+        this.modelNames = new HashMap<>();
+        this.modelOnlyAlert = new HashMap<>();
+        ConfigurationSection modelsSection = config.getConfigurationSection("detection.models");
+        if (modelsSection != null) {
+            for (String modelKey : modelsSection.getKeys(false)) {
+                ConfigurationSection modelSection = modelsSection.getConfigurationSection(modelKey);
+                if (modelSection != null) {
+                    String displayName = modelSection.getString("name", modelKey);
+                    boolean onlyAlertForModel = modelSection.getBoolean("only-alert", false);
+                    modelNames.put(modelKey, displayName);
+                    modelOnlyAlert.put(modelKey, onlyAlertForModel);
+                } else {
+                    String displayName = modelsSection.getString(modelKey);
+                    if (displayName != null && !displayName.isEmpty()) {
+                        modelNames.put(modelKey, displayName);
+                        modelOnlyAlert.put(modelKey, false);
+                    }
+                }
+            }
+        }
     }
 
     private double clampThreshold(double value, String configPath, Logger logger) {
@@ -463,5 +488,27 @@ public class Config {
 
     public boolean isFoliaRegionSchedulerEnabled() {
         return foliaRegionSchedulerEnabled;
+    }
+
+    public boolean isOnlyAlertForModel(String modelKey) {
+        if (modelKey == null) {
+            return false;
+        }
+        return modelOnlyAlert.getOrDefault(modelKey, false);
+    }
+
+    public String getModelDisplayName(String modelKey) {
+        if (modelKey == null) {
+            return "Unknown";
+        }
+        return modelNames.getOrDefault(modelKey, modelKey);
+    }
+
+    public Map<String, String> getModelNames() {
+        return modelNames;
+    }
+
+    public Map<String, Boolean> getModelOnlyAlert() {
+        return modelOnlyAlert;
     }
 }

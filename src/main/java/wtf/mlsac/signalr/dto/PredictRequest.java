@@ -21,14 +21,19 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr.dto;
+
 public class PredictRequest {
     public byte[] playerData;
     public String playerUuid;
-    public PredictRequest() {}
-    public PredictRequest(byte[] playerData, String playerUuid) {
+    public String playerName;
+
+    public PredictRequest() {
+    }
+
+    public PredictRequest(byte[] playerData, String playerUuid, String playerName) {
         this.playerData = playerData;
         this.playerUuid = playerUuid;
+        this.playerName = playerName;
     }
 }

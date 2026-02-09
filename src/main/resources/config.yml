@@ -16,7 +16,7 @@ outputDirectory: "data"
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            DETECTION SETTINGS                                 │
 # └───────────────────────────────────────────────────────────────────────────────┘
-
+# Guide https://mlsac.wtf/dashboard/wiki
 detection:
   # Enable AI-based cheat detection
   enabled: false
@@ -25,12 +25,16 @@ detection:
   endpoint: "https://api.mlsac.wtf"
   
   # API key for authentication
+  # To buy API key visit https://mlsac.wtf/dashboard
+  # Free trial up to 3 days is also available in dashboard
   api-key: "your-api-key"
-  
+
   # Number of ticks to collect per sample
+  # Do not change unless you know what you are doing
   sample-size: 40
   
   # Interval between samples (in ticks)
+  # Do not change unless you know what you are doing
   sample-interval: 10
   
   # WorldGuard integration for region-based AI check bypass.
@@ -45,10 +49,28 @@ detection:
     # Format: "world:region" or just "region" (applies to all worlds)
     disabled-regions:
       - "spawn:spawn"
+  
+  # Model settings
+  # Each model can have:
+  #   name: Display name shown in alerts
+  #   only-alert: When true, alerts are sent but NO punishments for this model
+  models:
+    fast:
+      name: "Fast-A1"
+      only-alert: false # Stable model - punishments enabled
+    pro:
+      name: "Pro-A1"
+      only-alert: true # Newest model - testing mode - no punishments
+    ultra:
+      name: "Ultra-A1"
+      only-alert: true # Model in development - testing mode - no punishments
+    experimental:
+      name: "Experimental" # You can change colors but change names is necessary
+      only-alert: true  # Test model- testing mode - no punishments
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                              ALERT SETTINGS                                   │
 # └───────────────────────────────────────────────────────────────────────────────┘
-
+# Guide https://mlsac.wtf/dashboard/wiki
 alerts:
   # Probability threshold for sending alerts (0.0 - 1.0) - lowered for early notification
   threshold: 0.75
@@ -59,26 +81,28 @@ alerts:
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            VIOLATION SETTINGS                                 │
 # └───────────────────────────────────────────────────────────────────────────────┘
-
+# Guide https://mlsac.wtf/dashboard/wiki
 violation:
   # VL threshold for triggering penalties (1 = immediate penalty on first detection)
   threshold: 40
   
   # VL reset value after penalty (0 = full reset)
+  # reset-value is should be /2 of threshold
   reset-value: 20  
   # Buffer increase multiplier: (probability - threshold) * multiplier
   # Example: prob 1.0 with threshold 0.70 = (1.0 - 0.70) * 33.33 = 10 buffer
   multiplier: 100.0
   
   # Buffer decay when probability < 0.1 (low probability threshold)
+  # Do not change unless you know what you are doing
   decay: 0.35
   # VL decay settings (reset VL when player is not in combat)
   # Protects legitimate players from random false positives
   vl-decay:
     # Enable automatic VL decay
-    enabled: true
+    enabled: false
     # Check interval in seconds (how often to check and reduce VL)
-    interval: 200
+    interval: 1500
     # Amount of VL to reduce per interval
     amount: 1
 # ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -99,10 +123,11 @@ violation:
 #
 # Legacy placeholders also supported: <player>, <vl>, <probability>, <buffer>
 #
-
+# Guide https://mlsac.wtf/dashboard/wiki
 penalties:
   # Minimum probability required for penalty execution (lowered for aggressiveness)
-  min-probability: 0.50
+  # Do not change unless you know what you are doing
+  min-probability: 0.01
   
   # Ban animation settings
   # Epic animation: levitation + purple/pink particles + lightning strike
@@ -114,17 +139,17 @@ penalties:
   # Actions by violation level
   # Aggressive system: alert -> kick -> ban
   actions:
-#    1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
     1: "{KICK} kick {PLAYER} MLSAC Detection (VL:{VL})"
     2: "{BAN} ban {PLAYER} Cheating (MLSAC VL:{VL})"
-
+#
+#  Also you could use  1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
 
 # ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            FOLIA SETTINGS                                     │
 # └───────────────────────────────────────────────────────────────────────────────┘
 #
 # These settings are only used when running on a Folia server.
-# On Bukkit/Paper/Spigot servers, these settings are ignored.
+# On Bukkit/Paper/Spigot/kSpigot servers, these settings are ignored.
 #
 
 folia:

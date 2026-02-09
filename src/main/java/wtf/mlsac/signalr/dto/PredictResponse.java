@@ -21,10 +21,13 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr.dto;
+
 public class PredictResponse {
     public float probability;
     public long inferenceTimeMs;
-    public PredictResponse() {}
+    public String model;
+
+    public PredictResponse() {
+    }
 }

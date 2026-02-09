@@ -235,11 +235,11 @@ public class AICheck {
         byte[] serialized = FlatBufferSerializer.serialize(ticks);
         final UUID playerUuid = player.getUniqueId();
         final String playerName = player.getName();
-        client.predict(serialized, playerUuid.toString())
-                .thenAccept(response -> processResponse(playerUuid, playerName, data, response))
-                .exceptionally(error -> {
+        client.predict(serialized, playerUuid.toString(), playerName)
+                .subscribe(response -> {
+                    schedulerAdapter.runSync(() -> processResponse(playerUuid, playerName, data, response));
+                }, error -> {
                     handleError(playerName, data, error);
-                    return null;
                 });
     }
 
@@ -256,13 +256,25 @@ public class AICheck {
                 return;
             }
             double probability = response.getProbability();
+            String modelName = response.getModel();
+            boolean isOnlyAlert = config.isOnlyAlertForModel(modelName);
+
             plugin.debug("[AI] Response for " + playerName + ": probability=" +
-                    String.format("%.3f", probability));
+                    String.format("%.3f", probability) + ", model=" + modelName +
+                    ", onlyAlert=" + isOnlyAlert);
+
+            if (alertManager.shouldAlert(probability)) {
+                alertManager.sendAlert(playerName, probability, data.getBuffer(), modelName);
+            }
+
+            if (isOnlyAlert) {
+                plugin.debug("[AI] Only-alert mode for model " + modelName + ", skipping buffer/punishment");
+                return;
+            }
+
             data.updateBuffer(probability, config.getAiBufferMultiplier(),
                     config.getAiBufferDecrease(), config.getAiAlertThreshold());
-            if (alertManager.shouldAlert(probability)) {
-                alertManager.sendAlert(playerName, probability, data.getBuffer());
-            }
+
             if (data.shouldFlag(config.getAiBufferFlag())) {
                 Player player = Bukkit.getPlayer(playerUuid);
                 if (player != null && player.isOnline()) {
@@ -318,8 +330,6 @@ public class AICheck {
     }
 
     public void handlePlayerQuit(Player player) {
-        // We no longer remove data on quit to keep history persistent as requested.
-        // Data will just sit in memory until server restart or manual clear.
     }
 
     public void clearAll() {

@@ -282,16 +282,9 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }
 
         plugin.getViolationManager().executeMaxPunishment(target);
-        // Warning: executeMaxPunishment doesn't return success status or action name
-        // easily without change,
-        // but we can assume if it ran it did something given checking in VM.
-        // Actually VM.executeMaxPunishment doesn't return anything.
-        // We can just say "Executed" or check if vm has commands.
         if (plugin.getPluginConfig().getPunishmentCommands().isEmpty()) {
             sender.sendMessage(getPrefix() + msg("punish-no-action"));
         } else {
-            // We don't know exact action here easily without refactoring VM to return it,
-            // but user just asked to execute it.
             sender.sendMessage(getPrefix() + msg("punish-success", "{PLAYER}", target.getName(), "{ACTION}", "Max VL"));
         }
         return true;
@@ -328,27 +321,8 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         String clientVer = version != null ? version.toString() : "Unknown";
 
         sender.sendMessage(ColorUtil.colorize(msg("profile-header", "{PLAYER}", target.getName())));
-        // Getting list message is slightly annoying with current msg() helper if it
-        // returns String.
-        // But MessagesConfig.getMessage returns String usually?
-        // Let's look at MessagesConfig.
-        // If profile-info is a list, getMessage might handle it or we need a
-        // getMessageList.
-        // Assuming we added it as list in YAML, but Config/MessagesConfig usually
-        // handles strings.
-        // I should check MessagesConfig.
-        // The msg() helper calls plugin.getMessagesConfig().getMessage(key).
-        // If it's a list in YAML, standard FileConfiguration.getString() returns null
-        // or first line?
-        // I need to check MessagesConfig.java to support lists or use single multiline
-        // string.
-        // I'll treat "profile-info" as Multi-line string in YAML or iterate manually if
-        // MessagesConfig supports it.
-        // Re-reading messages.yml edit: I used list format.
-        // Let's check MessagesConfig.java to see if it supports lists.
         List<String> info = plugin.getMessagesConfig().getMessageList("profile-info");
         if (info == null || info.isEmpty()) {
-            // Fallback if list support missing
             sender.sendMessage(ColorUtil.colorize("&7Sens: &f" + sens + "%"));
             sender.sendMessage(ColorUtil.colorize("&7Client: &f" + clientVer));
             sender.sendMessage(ColorUtil.colorize("&7Detections (>0.8): &f" + detections));
@@ -434,41 +408,13 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleStopAll(CommandSender sender) {
-        int count = 0;
-        List<DataSession> activeSessions = new ArrayList<>(sessionManager.getActiveSessions());
-        for (DataSession session : activeSessions) {
-            Player player = Bukkit.getPlayer(session.getUuid());
-            if (player != null) {
-                sessionManager.stopSession(player);
-                count++;
-            } else {
-                // Handle offline or disconnected player sessions if SessionManager supports
-                // removing strictly by UUID
-                // Assuming sessionManager.stopSession requires Player object based on
-                // interface, verify this.
-                // If the interface allows stopping by UUID or if we can reconstruct a player
-                // object...
-                // Actually, let's look at stopping loop safely.
-                // If stopSession requires Online Player, we might have issue with offline
-                // players in "all".
-                // But usually "active sessions" implies the player is somewhat valid or we have
-                // a handle.
-                // Based on "handleStopPlayer" checking Bukkit.getPlayer, let's assume online
-                // requirement for now unless we dig deeper.
-                // The user request says "stop all ... even offline".
-                // I need to check if sessionManager can stop independent of player instance or
-                // if I can mock it.
-                // Let's assume for "ALL" we iterate active sessions.
-            }
-        }
-        // Force stop all in manager which is likely implemented better there.
+        int count = sessionManager.getActiveSessionCount();
         sessionManager.stopAllSessions();
-        sender.sendMessage(getPrefix() + msg("all-sessions-stopped")); // Need to add this key or reuse something
+        sender.sendMessage(getPrefix() + msg("all-sessions-stopped", "{COUNT}", String.valueOf(count)));
         return true;
     }
 
     private boolean handleStopPlayer(CommandSender sender, String playerName) {
-        // Try online player first
         Player player = Bukkit.getPlayer(playerName);
         if (player != null) {
             if (!sessionManager.hasActiveSession(player)) {
@@ -480,7 +426,6 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // Try to finding session by name if player is offline
         DataSession targetSession = null;
         for (DataSession session : sessionManager.getActiveSessions()) {
             if (session.getPlayerName().equalsIgnoreCase(playerName)) {
@@ -490,33 +435,6 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }
 
         if (targetSession != null) {
-            // We need a way to stop session without player object if possible, or we need
-            // to fix SessionManager.
-            // Looking at existing code: sessionManager.stopSession(Player player).
-            // I'll need to check SessionManager interface.
-            // For now, let's assume we might need to expand SessionManager or use a
-            // workaround.
-            // If I can't stop it cleanly without Player object, I might be blocked.
-            // But let's look at DataSession... it has UUID.
-            // I'll implement a best-effort stop here.
-            // Actually, I should probably add stopSession(UUID) to SessionManager if it
-            // doesn't exist.
-            // But since I can't see SessionManager source right here (it's an interface or
-            // class in another file),
-            // I will assume I can't easily change the interface *right now* without reading
-            // it.
-            // Wait, I saw SessionManager file in the file list earlier? No, I saw
-            // ISessionManager.
-
-            // Let's just try to pass the session to the manager if possible or iterate.
-            // Actually, sessionManager.stopAllSessions() exists.
-            // I will rely on "stopAllSessions" for "stop all".
-
-            // For offline single player stop:
-            // If the API only accepts Player, I can't fix it without changing API.
-            // I will defer the "offline stop" implementation detail to the next step where
-            // I can verify/modify SessionManager.
-            // For now, I will implement the command logic assuming I will fix the backend.
             sender.sendMessage(getPrefix()
                     + ColorUtil.colorize("&cOffline stopping not fully supported without SessionManager update."));
             return true;

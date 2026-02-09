@@ -151,11 +151,15 @@ def configureShadowJar(task, classifier, sourceSetName, javaVersion = null) {
     
     task.mergeServiceFiles()
     
-    // Relocate packages (DON'T relocate PacketEvents to avoid conflicts)
+    // Relocate packages to avoid conflicts with other plugins
+    task.relocate 'io.github.retrooper.packetevents', 'wtf.mlsac.libs.packetevents'
+    task.relocate 'com.github.retrooper.packetevents', 'wtf.mlsac.libs.packetevents'
     task.relocate 'com.google.flatbuffers', 'net.mlsac.libs.flatbuffers'
     task.relocate 'com.google.common', 'net.mlsac.libs.guava'
     task.relocate 'com.google.gson', 'net.mlsac.libs.gson'
     task.relocate 'com.microsoft.signalr', 'net.mlsac.libs.signalr'
+    task.relocate 'org.msgpack.core', 'net.mlsac.libs.msgpack.core'
+    task.relocate 'org.msgpack.value', 'net.mlsac.libs.msgpack.value'
     task.relocate 'org.msgpack', 'net.mlsac.libs.msgpack'
     task.relocate 'okhttp3', 'net.mlsac.libs.okhttp3'
     task.relocate 'okio', 'net.mlsac.libs.okio'

@@ -253,12 +253,6 @@ public class ViolationManager {
 
         if (maxThreshold != -1) {
             String command = commands.get(maxThreshold);
-            // Use current VL or max VL? The context suggests punishing them immediately.
-            // Using a dummy high VL/prob/buffer for the context log if needed, or fetching
-            // current.
-            // But ActionType usually uses {VL} placeholder.
-            // I'll use the maxThreshold as the VL for the context to ensure it looks like a
-            // max punishment.
             executeCommand(command, player, 1.0, 100.0, maxThreshold);
         }
     }
