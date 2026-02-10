@@ -263,19 +263,18 @@ public class AICheck {
                     String.format("%.3f", probability) + ", model=" + modelName +
                     ", onlyAlert=" + isOnlyAlert);
 
+            if (!isOnlyAlert) {
+                data.updateBuffer(probability, config.getAiBufferMultiplier(),
+                        config.getAiBufferDecrease(), config.getAiAlertThreshold());
+            } else {
+                plugin.debug("[AI] Only-alert mode for model " + modelName + ", skipping buffer/punishment");
+            }
+
             if (alertManager.shouldAlert(probability)) {
                 alertManager.sendAlert(playerName, probability, data.getBuffer(), modelName);
             }
 
-            if (isOnlyAlert) {
-                plugin.debug("[AI] Only-alert mode for model " + modelName + ", skipping buffer/punishment");
-                return;
-            }
-
-            data.updateBuffer(probability, config.getAiBufferMultiplier(),
-                    config.getAiBufferDecrease(), config.getAiAlertThreshold());
-
-            if (data.shouldFlag(config.getAiBufferFlag())) {
+            if (!isOnlyAlert && data.shouldFlag(config.getAiBufferFlag())) {
                 Player player = Bukkit.getPlayer(playerUuid);
                 if (player != null && player.isOnline()) {
                     violationManager.handleFlag(player, probability, data.getBuffer());
@@ -285,6 +284,7 @@ public class AICheck {
                 data.resetBuffer(config.getAiBufferResetOnFlag());
             }
         });
+
     }
 
     private void handleInvalidSequence(String error) {

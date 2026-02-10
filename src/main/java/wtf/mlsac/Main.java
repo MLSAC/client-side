@@ -210,13 +210,19 @@ public final class Main extends JavaPlugin {
             try {
                 aiClientProvider.shutdown().get(5, java.util.concurrent.TimeUnit.SECONDS);
             } catch (Exception e) {
-                getLogger().warning("Error shutting down SignalR client: " + e.getMessage());
+                if (e.getMessage() != null) {
+                    getLogger().warning("Error shutting down SignalR client: " + e.getMessage());
+                } else {
+                    getLogger().warning("Error shutting down SignalR client during disable:");
+                    e.printStackTrace();
+                }
             }
         }
         if (PacketEvents.getAPI() != null && PacketEvents.getAPI().isInitialized()) {
             PacketEvents.getAPI().terminate();
         }
         SchedulerManager.reset();
+
         getLogger().info("MLSAC disabled successfully!");
     }
 

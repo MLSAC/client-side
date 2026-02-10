@@ -191,9 +191,9 @@ public class SignalRClient implements IAIClient {
     public CompletableFuture<Void> disconnect() {
         shuttingDown = true;
         autoReconnectEnabled = false;
-        if (reconnectTask.get() != null) {
-            reconnectTask.get().cancel();
-            reconnectTask.set(null);
+        ScheduledTask task = reconnectTask.getAndSet(null);
+        if (task != null) {
+            task.cancel();
         }
         return CompletableFuture.runAsync(() -> {
             try {
