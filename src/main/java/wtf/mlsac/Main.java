@@ -205,7 +205,7 @@ public final class Main extends JavaPlugin {
         if (commandHandler != null) {
             commandHandler.cleanup();
         }
-        if (aiClientProvider != null && aiClientProvider.isAvailable()) {
+        if (aiClientProvider != null) {
             getLogger().info("Shutting down SignalR client...");
             try {
                 aiClientProvider.shutdown().get(5, java.util.concurrent.TimeUnit.SECONDS);

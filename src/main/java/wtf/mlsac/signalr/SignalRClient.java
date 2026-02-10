@@ -24,6 +24,7 @@
 package wtf.mlsac.signalr;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import wtf.mlsac.scheduler.ScheduledTask;
 import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIResponse;
 import wtf.mlsac.server.IAIClient;
@@ -70,6 +71,9 @@ public class SignalRClient implements IAIClient {
     }
 
     public synchronized CompletableFuture<Boolean> connect() {
+        if (shuttingDown) {
+            return CompletableFuture.completedFuture(false);
+        }
         if (connectionFuture != null && !connectionFuture.isDone()) {
             return connectionFuture;
         }
@@ -154,6 +158,9 @@ public class SignalRClient implements IAIClient {
     }
 
     private CompletableFuture<Boolean> connectWithRetry(int attempt) {
+        if (shuttingDown) {
+            return CompletableFuture.completedFuture(false);
+        }
         if (attempt >= MAX_RETRY_ATTEMPTS) {
             logger.severe("[SignalR] Max retry attempts reached, giving up");
             return CompletableFuture.completedFuture(false);
@@ -180,6 +187,10 @@ public class SignalRClient implements IAIClient {
     public CompletableFuture<Void> disconnect() {
         shuttingDown = true;
         autoReconnectEnabled = false;
+        if (reconnectTask.get() != null) {
+            reconnectTask.get().cancel();
+            reconnectTask.set(null);
+        }
         return CompletableFuture.runAsync(() -> {
             try {
                 if (heartbeatScheduler != null) {
@@ -244,7 +255,13 @@ public class SignalRClient implements IAIClient {
         });
     }
 
+    private final java.util.concurrent.atomic.AtomicReference<ScheduledTask> reconnectTask = new java.util.concurrent.atomic.AtomicReference<>();
+
     private void scheduleReconnect() {
+        if (reconnectTask.get() != null) {
+            return;
+        }
+
         int attempt = autoReconnectAttempts.incrementAndGet();
         long delayMs = RECONNECT_INTERVAL_MS;
         long delaySeconds = delayMs / 1000;
@@ -252,7 +269,10 @@ public class SignalRClient implements IAIClient {
         logger.info("[SignalR] Scheduling reconnect attempt " + attempt + " in " + delaySeconds + " seconds...");
 
         long delayTicks = delayMs / 50;
-        SchedulerManager.getAdapter().runAsyncDelayed(this::attemptReconnect, delayTicks);
+        reconnectTask.set(SchedulerManager.getAdapter().runAsyncDelayed(() -> {
+            reconnectTask.set(null);
+            attemptReconnect();
+        }, delayTicks));
     }
 
     private void attemptReconnect() {
@@ -279,10 +299,6 @@ public class SignalRClient implements IAIClient {
             scheduleReconnect();
             return null;
         });
-    }
-
-    private long calculateReconnectDelay(int attempt) {
-        return RECONNECT_INTERVAL_MS;
     }
 
     public void setAutoReconnectEnabled(boolean enabled) {

@@ -34,8 +34,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class SignalRSessionManager {
-    private static final long SERVER_TIMEOUT_MS = 60000;
-    private static final long KEEP_ALIVE_INTERVAL_MS = 15000;
+    private static final long SERVER_TIMEOUT_MS = 120000;
+    private static final long KEEP_ALIVE_INTERVAL_MS = 30000;
     private final Logger logger;
     private final SignalREndpointConfig endpointConfig;
     private final String hubUrl;
@@ -293,9 +293,10 @@ public class SignalRSessionManager {
     public CompletableFuture<Void> closeSession() {
         return CompletableFuture.runAsync(() -> {
             try {
-                if (hubConnection != null &&
-                        hubConnection.getConnectionState() == HubConnectionState.CONNECTED) {
+                if (hubConnection != null) {
+                    logger.info("[SignalR] Stopping HubConnection...");
                     hubConnection.stop().blockingAwait();
+                    logger.info("[SignalR] HubConnection stopped.");
                 }
             } catch (Exception e) {
                 logger.warning("[SignalR] Error closing connection: " + e.getMessage());
