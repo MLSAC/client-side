@@ -21,12 +21,13 @@
  * All derived code is licensed under GPL-3.0.
  */
 
-
 package wtf.mlsac.signalr;
+
 import org.bukkit.plugin.java.JavaPlugin;
 import wtf.mlsac.scheduler.ScheduledTask;
 import wtf.mlsac.scheduler.SchedulerManager;
 import java.util.logging.Logger;
+
 public class SignalRHeartbeatScheduler {
     private static final int DEFAULT_INTERVAL_SECONDS = 30;
     private final JavaPlugin plugin;
@@ -34,22 +35,30 @@ public class SignalRHeartbeatScheduler {
     private final Logger logger;
     private ScheduledTask scheduledTask;
     private Runnable onSessionExpiredCallback;
+    private Runnable onConnectionLostCallback;
+    private int failureCount = 0;
+    private static final int MAX_FAILURES = 2;
+
     public SignalRHeartbeatScheduler(JavaPlugin plugin, SignalRSessionManager sessionManager) {
         this.plugin = plugin;
         this.sessionManager = sessionManager;
         this.logger = plugin.getLogger();
     }
+
     public void start() {
         start(DEFAULT_INTERVAL_SECONDS);
     }
+
     public void start(int intervalSeconds) {
         if (scheduledTask != null) {
             stop();
         }
         long intervalTicks = intervalSeconds * 20L;
-        scheduledTask = SchedulerManager.getAdapter().runAsyncRepeating(this::sendHeartbeat, intervalTicks, intervalTicks);
+        scheduledTask = SchedulerManager.getAdapter().runAsyncRepeating(this::sendHeartbeat, intervalTicks,
+                intervalTicks);
         logger.info("[SignalR] Heartbeat scheduler started (interval: " + intervalSeconds + "s)");
     }
+
     public void stop() {
         if (scheduledTask != null) {
             scheduledTask.cancel();
@@ -57,26 +66,60 @@ public class SignalRHeartbeatScheduler {
             logger.info("[SignalR] Heartbeat scheduler stopped");
         }
     }
+
     private void sendHeartbeat() {
         if (!sessionManager.isSessionValid()) {
+            // Check if it's because it's disconnected
+            if (sessionManager.getConnectionState() != com.microsoft.signalr.HubConnectionState.CONNECTED) {
+                handleConnectionLost("Connection state is " + sessionManager.getConnectionState());
+            }
             return;
         }
         sessionManager.sendHeartbeat()
-            .thenAccept(result -> {
-                if (!result.isSuccess()) {
-                    String error = result.getError();
-                    if (error != null && (error.contains("expired") || error.contains("invalid"))) {
-                        logger.warning("[SignalR] Heartbeat failed: " + error);
-                        if (onSessionExpiredCallback != null) {
-                            onSessionExpiredCallback.run();
+                .thenAccept(result -> {
+                    if (result.isSuccess()) {
+                        failureCount = 0;
+                    } else {
+                        failureCount++;
+                        String error = result.getError();
+                        logger.warning(
+                                "[SignalR] Heartbeat failed (" + failureCount + "/" + MAX_FAILURES + "): " + error);
+
+                        if (error != null && (error.contains("expired") || error.contains("invalid")
+                                || error.contains("NOT_AUTHENTICATED"))) {
+                            if (onSessionExpiredCallback != null) {
+                                onSessionExpiredCallback.run();
+                            }
+                        } else if (failureCount >= MAX_FAILURES) {
+                            handleConnectionLost(error);
                         }
                     }
-                }
-            });
+                }).exceptionally(ex -> {
+                    failureCount++;
+                    logger.warning("[SignalR] Heartbeat encountered exception (" + failureCount + "/" + MAX_FAILURES
+                            + "): " + ex.getMessage());
+                    if (failureCount >= MAX_FAILURES) {
+                        handleConnectionLost(ex.getMessage());
+                    }
+                    return null;
+                });
     }
+
+    private void handleConnectionLost(String reason) {
+        logger.severe("[SignalR] Proactive connection check failed: " + reason);
+        if (onConnectionLostCallback != null) {
+            onConnectionLostCallback.run();
+        }
+    }
+
+    public void setOnConnectionLostCallback(Runnable callback) {
+        this.onConnectionLostCallback = callback;
+    }
+
     public void setOnSessionExpiredCallback(Runnable callback) {
         this.onSessionExpiredCallback = callback;
     }
+
     public boolean isRunning() {
         return scheduledTask != null && !scheduledTask.isCancelled();
     }

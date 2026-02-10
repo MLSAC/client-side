@@ -130,6 +130,10 @@ public class SignalRClient implements IAIClient {
                 if (this.heartbeatScheduler == null) {
                     this.heartbeatScheduler = new SignalRHeartbeatScheduler(plugin, sessionManager);
                     heartbeatScheduler.setOnSessionExpiredCallback(this::handleSessionExpired);
+                    heartbeatScheduler.setOnConnectionLostCallback(() -> {
+                        logger.warning("[SignalR] Heartbeat lost connection, forcing reconnect...");
+                        handleDisconnection(new RuntimeException("Heartbeat proactive check failed"));
+                    });
                 }
 
                 heartbeatScheduler.start();

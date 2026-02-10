@@ -142,6 +142,7 @@ public class SignalRSessionManager {
             try {
                 String methodName = endpointConfig.getMethodName("heartbeat");
                 HeartbeatResponse response = hubConnection.invoke(HeartbeatResponse.class, methodName)
+                        .timeout(10, java.util.concurrent.TimeUnit.SECONDS)
                         .blockingGet();
                 long serverTime = response != null ? response.serverTime : 0;
                 this.lastServerTime = serverTime;
