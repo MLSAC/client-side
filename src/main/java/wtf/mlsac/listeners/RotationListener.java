@@ -60,7 +60,7 @@ public class RotationListener extends PacketListenerAbstract {
 
     @Override
     public void onUserDisconnect(UserDisconnectEvent event) {
-        if (event.getUser() != null) {
+        if (event.getUser() != null && event.getUser().getUUID() != null) {
             fixStates.remove(event.getUser().getUUID());
         }
     }
