@@ -75,6 +75,10 @@ public class Config {
     private final boolean foliaRegionSchedulerEnabled;
     private final Map<String, String> modelNames;
     private final Map<String, Boolean> modelOnlyAlert;
+    private final boolean analyticsEnabled;
+    private final int analyticsMinDetections;
+    private final int analyticsColorGreenMax;
+    private final int analyticsColorOrangeMax;
     public static final boolean DEFAULT_DEBUG = false;
     public static final String DEFAULT_OUTPUT_DIRECTORY = "plugins/MLSAC/data";
     public static final int PRE_HIT_TICKS = 5;
@@ -116,6 +120,10 @@ public class Config {
     public static final int DEFAULT_FOLIA_THREAD_POOL_SIZE = 0;
     public static final boolean DEFAULT_FOLIA_ENTITY_SCHEDULER_ENABLED = true;
     public static final boolean DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED = true;
+    public static final boolean DEFAULT_ANALYTICS_ENABLED = true;
+    public static final int DEFAULT_ANALYTICS_MIN_DETECTIONS = 5;
+    public static final int DEFAULT_ANALYTICS_COLOR_GREEN_MAX = 10;
+    public static final int DEFAULT_ANALYTICS_COLOR_ORANGE_MAX = 20;
 
     public Config() {
         this.debug = DEFAULT_DEBUG;
@@ -163,6 +171,10 @@ public class Config {
         this.foliaRegionSchedulerEnabled = DEFAULT_FOLIA_REGION_SCHEDULER_ENABLED;
         this.modelNames = new HashMap<>();
         this.modelOnlyAlert = new HashMap<>();
+        this.analyticsEnabled = DEFAULT_ANALYTICS_ENABLED;
+        this.analyticsMinDetections = DEFAULT_ANALYTICS_MIN_DETECTIONS;
+        this.analyticsColorGreenMax = DEFAULT_ANALYTICS_COLOR_GREEN_MAX;
+        this.analyticsColorOrangeMax = DEFAULT_ANALYTICS_COLOR_ORANGE_MAX;
     }
 
     private static Set<String> createDefaultCheatReasons() {
@@ -284,6 +296,11 @@ public class Config {
                 }
             }
         }
+
+        this.analyticsEnabled = config.getBoolean("analytics.enabled", DEFAULT_ANALYTICS_ENABLED);
+        this.analyticsMinDetections = config.getInt("analytics.min-detections", DEFAULT_ANALYTICS_MIN_DETECTIONS);
+        this.analyticsColorGreenMax = config.getInt("analytics.colors.green", DEFAULT_ANALYTICS_COLOR_GREEN_MAX);
+        this.analyticsColorOrangeMax = config.getInt("analytics.colors.orange", DEFAULT_ANALYTICS_COLOR_ORANGE_MAX);
     }
 
     private double clampThreshold(double value, String configPath, Logger logger) {
@@ -510,5 +527,31 @@ public class Config {
 
     public Map<String, Boolean> getModelOnlyAlert() {
         return modelOnlyAlert;
+    }
+
+    public boolean isAnalyticsEnabled() {
+        return analyticsEnabled;
+    }
+
+    public int getAnalyticsMinDetections() {
+        return analyticsMinDetections;
+    }
+
+    public int getAnalyticsColorGreenMax() {
+        return analyticsColorGreenMax;
+    }
+
+    public int getAnalyticsColorOrangeMax() {
+        return analyticsColorOrangeMax;
+    }
+
+    public String getDetectionColor(int detections) {
+        if (detections <= analyticsColorGreenMax) {
+            return "&a";
+        } else if (detections <= analyticsColorOrangeMax) {
+            return "&6";
+        } else {
+            return "&c";
+        }
     }
 }

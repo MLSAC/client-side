@@ -3,7 +3,7 @@ prefix: "&6[MLSAC] &r"
 alerts-enabled: "&aAlerts enabled"
 alerts-disabled: "&eAlerts disabled"
 alert-format: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &dModel: &f{MODEL}"
-alert-format-vl: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &cVL: {VL} &7| &dModel: &f{MODEL}"
+alert-format-vl: "&c{PLAYER} &7| &6Prob: &f{PROBABILITY} &7| &6Buffer: &f{BUFFER} &7| &cVL: {VL}"
 
 unknown-command: "&cUnknown command: &f{ARGS}"
 players-only: "&cThis command is for players only"
@@ -53,3 +53,5 @@ profile-info:
   - "&7Sens: &f{SENS}%"
   - "&7Client: &f{CLIENT}"
   - "&7Detections (>0.8): &f{DETECTIONS}"
+
+analytics-join-alert: "Player found in database &e{PLAYER} &7({DETECTIONS_COLORED}&7)"

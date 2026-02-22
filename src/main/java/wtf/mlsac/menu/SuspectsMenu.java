@@ -21,7 +21,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import wtf.mlsac.checks.AICheck;
+import wtf.mlsac.config.Config;
 import wtf.mlsac.data.AIPlayerData;
+import wtf.mlsac.server.AnalyticsClient;
 import wtf.mlsac.util.ColorUtil;
 import wtf.mlsac.Main;
 import wtf.mlsac.scheduler.SchedulerManager;
@@ -29,6 +31,7 @@ import wtf.mlsac.scheduler.SchedulerManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class SuspectsMenu implements Listener {
@@ -37,14 +40,19 @@ public class SuspectsMenu implements Listener {
     private final Player admin;
     private final Inventory inventory;
     private final AICheck aiCheck;
+    private final AnalyticsClient analyticsClient;
+    private final Config pluginConfig;
     private int page = 0;
     private static final int ITEMS_PER_PAGE = 45;
 
     public SuspectsMenu(JavaPlugin plugin, Player admin) {
         this.plugin = plugin;
         this.admin = admin;
-        this.aiCheck = ((Main) plugin).getAiCheck();
-        org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig().getConfig();
+        Main main = (Main) plugin;
+        this.aiCheck = main.getAiCheck();
+        this.analyticsClient = main.getAnalyticsClient();
+        this.pluginConfig = main.getPluginConfig();
+        org.bukkit.configuration.file.FileConfiguration config = main.getMenuConfig().getConfig();
         String title = config.getString("gui.title", "&cMLSAC &8> &7Suspects");
         this.inventory = Bukkit.createInventory(null, 54, ColorUtil.colorize(title));
         Bukkit.getPluginManager().registerEvents(this, plugin);
@@ -104,44 +112,62 @@ public class SuspectsMenu implements Listener {
             final int finalEnd = end;
             final int finalTotalSuspects = suspectDataList.size();
 
-            SchedulerManager.getAdapter().runSync(() -> {
-                inventory.clear();
-                org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig().getConfig();
-
-                for (int i = 0; i < pageData.size(); i++) {
-                    SuspectData data = pageData.get(i);
-                    inventory.setItem(i, createSuspectHeadFromData(data, config));
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            for (SuspectData data : pageData) {
+                if (analyticsClient != null) {
+                    CompletableFuture<Void> future = analyticsClient.checkPlayer(data.name).thenAccept(result -> {
+                        if (result.isFound()) {
+                            data.analyticsDetections = result.getTotalDetections();
+                            data.analyticsFound = true;
+                        }
+                    });
+                    futures.add(future);
                 }
+            }
 
-                if (currentPage > 0) {
-                    Material prevMat = Material.valueOf(config.getString("gui.items.previous_page.material", "ARROW"));
-                    String prevName = config.getString("gui.items.previous_page.name", "&ePrevious Page (&f{PAGE}&e)");
-                    inventory.setItem(45,
-                            createButtonItem(prevMat, prevName.replace("{PAGE}", String.valueOf(currentPage))));
-                }
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenRun(() -> {
+                SchedulerManager.getAdapter().runSync(() -> {
+                    inventory.clear();
+                    org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig()
+                            .getConfig();
 
-                Material infoMat = Material.valueOf(config.getString("gui.items.page_info.material", "PAPER"));
-                String infoName = config.getString("gui.items.page_info.name", "&bPage &f{CURRENT} &7/ &f{TOTAL}");
-                inventory.setItem(49, createButtonItem(infoMat, infoName
-                        .replace("{CURRENT}", String.valueOf(currentPage + 1))
-                        .replace("{TOTAL}", String.valueOf(Math.max(1, finalTotalPages)))));
-
-                if (finalEnd < finalTotalSuspects) {
-                    Material nextMat = Material.valueOf(config.getString("gui.items.next_page.material", "ARROW"));
-                    String nextName = config.getString("gui.items.next_page.name", "&eNext Page (&f{PAGE}&e)");
-                    inventory.setItem(53,
-                            createButtonItem(nextMat, nextName.replace("{PAGE}", String.valueOf(currentPage + 2))));
-                }
-
-                Material fillerMat = Material
-                        .valueOf(config.getString("gui.items.filler.material", "GRAY_STAINED_GLASS_PANE"));
-                String fillerName = config.getString("gui.items.filler.name", " ");
-                ItemStack filler = createButtonItem(fillerMat, fillerName);
-                for (int i = 45; i < 54; i++) {
-                    if (inventory.getItem(i) == null) {
-                        inventory.setItem(i, filler);
+                    for (int i = 0; i < pageData.size(); i++) {
+                        SuspectData data = pageData.get(i);
+                        inventory.setItem(i, createSuspectHeadFromData(data, config));
                     }
-                }
+
+                    if (currentPage > 0) {
+                        Material prevMat = Material
+                                .valueOf(config.getString("gui.items.previous_page.material", "ARROW"));
+                        String prevName = config.getString("gui.items.previous_page.name",
+                                "&ePrevious Page (&f{PAGE}&e)");
+                        inventory.setItem(45,
+                                createButtonItem(prevMat, prevName.replace("{PAGE}", String.valueOf(currentPage))));
+                    }
+
+                    Material infoMat = Material.valueOf(config.getString("gui.items.page_info.material", "PAPER"));
+                    String infoName = config.getString("gui.items.page_info.name", "&bPage &f{CURRENT} &7/ &f{TOTAL}");
+                    inventory.setItem(49, createButtonItem(infoMat, infoName
+                            .replace("{CURRENT}", String.valueOf(currentPage + 1))
+                            .replace("{TOTAL}", String.valueOf(Math.max(1, finalTotalPages)))));
+
+                    if (finalEnd < finalTotalSuspects) {
+                        Material nextMat = Material.valueOf(config.getString("gui.items.next_page.material", "ARROW"));
+                        String nextName = config.getString("gui.items.next_page.name", "&eNext Page (&f{PAGE}&e)");
+                        inventory.setItem(53,
+                                createButtonItem(nextMat, nextName.replace("{PAGE}", String.valueOf(currentPage + 2))));
+                    }
+
+                    Material fillerMat = Material
+                            .valueOf(config.getString("gui.items.filler.material", "GRAY_STAINED_GLASS_PANE"));
+                    String fillerName = config.getString("gui.items.filler.name", " ");
+                    ItemStack filler = createButtonItem(fillerMat, fillerName);
+                    for (int i = 45; i < 54; i++) {
+                        if (inventory.getItem(i) == null) {
+                            inventory.setItem(i, filler);
+                        }
+                    }
+                });
             });
         });
     }
@@ -151,6 +177,8 @@ public class SuspectsMenu implements Listener {
         final String name;
         final double avgProbability;
         final List<Double> history;
+        volatile int analyticsDetections = 0;
+        volatile boolean analyticsFound = false;
 
         SuspectData(UUID uuid, String name, double avgProbability, List<Double> history) {
             this.uuid = uuid;
@@ -194,10 +222,18 @@ public class SuspectsMenu implements Listener {
             }
 
             for (String line : loreFormat) {
+                String detectionsStr;
+                if (data.analyticsFound) {
+                    String color = pluginConfig.getDetectionColor(data.analyticsDetections);
+                    detectionsStr = color + data.analyticsDetections;
+                } else {
+                    detectionsStr = "&7N/A";
+                }
                 lore.add(ColorUtil.colorize(line
                         .replace("{AVG_PROB}", getColorInfo(data.avgProbability))
                         .replace("{HISTORY_SIZE}", String.valueOf(data.history.size()))
-                        .replace("{HISTORY}", historyStr.toString().trim())));
+                        .replace("{HISTORY}", historyStr.toString().trim())
+                        .replace("{DETECTIONS}", detectionsStr)));
             }
 
             meta.setLore(lore);

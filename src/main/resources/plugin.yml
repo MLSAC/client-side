@@ -21,6 +21,20 @@ permissions:
   mlsac.admin:
     description: Allows use of all MLSAC commands
     default: op
+    children:
+      mlsac.alerts: true
+      mlsac.prob: true
+      mlsac.reload: true
+      mlsac.collect: true
   mlsac.alerts:
     description: Allows toggling AI alerts
+    default: op
+  mlsac.prob:
+    description: Allows probability tracking
+    default: op
+  mlsac.reload:
+    description: Allows config reload
+    default: op
+  mlsac.collect:
+    description: Allows data collection
     default: op

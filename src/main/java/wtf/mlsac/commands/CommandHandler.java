@@ -128,7 +128,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             return true;
         }
         Player player = (Player) sender;
-        if (!player.hasPermission(Permissions.ALERTS)) {
+        if (!player.hasPermission(Permissions.ALERTS) && !player.hasPermission(Permissions.ADMIN)) {
             player.sendMessage(getPrefix() + msg("no-permission"));
             return true;
         }
@@ -142,7 +142,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             return true;
         }
         Player player = (Player) sender;
-        if (!player.hasPermission(Permissions.ALERTS)) {
+        if (!player.hasPermission(Permissions.ALERTS) && !player.hasPermission(Permissions.ADMIN)) {
             player.sendMessage(getPrefix() + msg("no-permission"));
             return true;
         }
@@ -156,7 +156,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             return true;
         }
         Player admin = (Player) sender;
-        if (!admin.hasPermission(Permissions.PROB)) {
+        if (!admin.hasPermission(Permissions.PROB) && !admin.hasPermission(Permissions.ADMIN)) {
             admin.sendMessage(getPrefix() + msg("no-permission"));
             return true;
         }
@@ -230,7 +230,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleReload(CommandSender sender) {
-        if (!sender.hasPermission(Permissions.RELOAD)) {
+        if (!sender.hasPermission(Permissions.RELOAD) && !sender.hasPermission(Permissions.ADMIN)) {
             sender.sendMessage(getPrefix() + msg("no-permission"));
             return true;
         }

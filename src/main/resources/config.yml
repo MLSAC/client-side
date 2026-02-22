@@ -145,6 +145,24 @@ penalties:
 #  Also you could use  1: "{CUSTOM_ALERT} &c{PLAYER} &7is suspicious &8(&fVL:&e{VL}&8, &fProb:&e{PROBABILITY}&8)"
 
 # ┌───────────────────────────────────────────────────────────────────────────────┐
+# │                        ANALYTICS JOIN ALERT                                   │
+# └───────────────────────────────────────────────────────────────────────────────┘
+# Alert staff when a player with detections in the MLSAC database joins the server.
+# Uses the /analytics/check/<nick> API endpoint.
+analytics:
+  # Enable analytics join alerts
+  enabled: true
+  # Minimum detections required to send an alert (below this → no message)
+  min-detections: 5
+  # Detection count color thresholds
+  # detections <= green  → &a (green)
+  # detections <= orange → &6 (orange)
+  # detections > orange  → &c (red)
+  colors:
+    green: 10
+    orange: 20
+
+# ┌───────────────────────────────────────────────────────────────────────────────┐
 # │                            FOLIA SETTINGS                                     │
 # └───────────────────────────────────────────────────────────────────────────────┘
 #

@@ -42,6 +42,7 @@ import wtf.mlsac.listeners.TeleportListener;
 import wtf.mlsac.listeners.TickListener;
 import wtf.mlsac.scheduler.SchedulerManager;
 import wtf.mlsac.server.AIClientProvider;
+import wtf.mlsac.server.AnalyticsClient;
 import wtf.mlsac.session.ISessionManager;
 import wtf.mlsac.session.SessionManager;
 import wtf.mlsac.violation.ViolationManager;
@@ -70,6 +71,7 @@ public final class Main extends JavaPlugin {
     private NametagManager nametagManager;
     private AICheck aiCheck;
     private UpdateChecker updateChecker;
+    private AnalyticsClient analyticsClient;
 
     @Override
     public void onLoad() {
@@ -147,9 +149,10 @@ public final class Main extends JavaPlugin {
         this.tickListener = new TickListener(this, sessionManager, aiCheck, nametagManager);
         this.hitListener = new HitListener(sessionManager, aiCheck);
         this.rotationListener = new RotationListener(sessionManager, aiCheck);
+        this.analyticsClient = new AnalyticsClient(config.getServerAddress(), getLogger());
         this.playerListener = new PlayerListener(this, aiCheck, alertManager, violationManager,
                 sessionManager instanceof SessionManager ? (SessionManager) sessionManager : null, tickListener,
-                nametagManager);
+                nametagManager, analyticsClient);
         this.teleportListener = new TeleportListener(aiCheck);
         this.tickListener.setHitListener(hitListener);
         this.playerListener.setHitListener(hitListener);
@@ -312,6 +315,10 @@ public final class Main extends JavaPlugin {
 
     public UpdateChecker getUpdateChecker() {
         return updateChecker;
+    }
+
+    public AnalyticsClient getAnalyticsClient() {
+        return analyticsClient;
     }
 
     public void debug(String message) {

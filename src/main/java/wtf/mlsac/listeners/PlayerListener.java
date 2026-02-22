@@ -36,8 +36,12 @@ import wtf.mlsac.Main;
 import wtf.mlsac.Permissions;
 import wtf.mlsac.alert.AlertManager;
 import wtf.mlsac.checks.AICheck;
+import wtf.mlsac.config.Config;
+import wtf.mlsac.config.MessagesConfig;
 import wtf.mlsac.scheduler.SchedulerManager;
+import wtf.mlsac.server.AnalyticsClient;
 import wtf.mlsac.session.SessionManager;
+import wtf.mlsac.util.ColorUtil;
 import wtf.mlsac.violation.ViolationManager;
 
 public class PlayerListener implements Listener {
@@ -48,11 +52,13 @@ public class PlayerListener implements Listener {
     private final SessionManager sessionManager;
     private final TickListener tickListener;
     private final wtf.mlsac.hologram.NametagManager nametagManager;
+    private final AnalyticsClient analyticsClient;
     private HitListener hitListener;
 
     public PlayerListener(JavaPlugin plugin, AICheck aiCheck, AlertManager alertManager,
             ViolationManager violationManager, SessionManager sessionManager,
-            TickListener tickListener, wtf.mlsac.hologram.NametagManager nametagManager) {
+            TickListener tickListener, wtf.mlsac.hologram.NametagManager nametagManager,
+            AnalyticsClient analyticsClient) {
         this.plugin = plugin;
         this.aiCheck = aiCheck;
         this.alertManager = alertManager;
@@ -60,6 +66,7 @@ public class PlayerListener implements Listener {
         this.sessionManager = sessionManager;
         this.tickListener = tickListener;
         this.nametagManager = nametagManager;
+        this.analyticsClient = analyticsClient;
     }
 
     public void setHitListener(HitListener hitListener) {
@@ -100,6 +107,38 @@ public class PlayerListener implements Listener {
             }, 20L);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to schedule player join task: " + e.getMessage());
+        }
+
+        if (analyticsClient != null && plugin instanceof Main) {
+            Main main = (Main) plugin;
+            Config config = main.getPluginConfig();
+            if (config.isAnalyticsEnabled()) {
+                analyticsClient.checkPlayer(player.getName()).thenAccept(result -> {
+                    if (result.isFound() && result.getTotalDetections() >= config.getAnalyticsMinDetections()) {
+                        MessagesConfig messagesConfig = main.getMessagesConfig();
+                        String colorCode = config.getDetectionColor(result.getTotalDetections());
+                        String detectionsColored = colorCode + result.getTotalDetections();
+                        String template = messagesConfig.getMessage("analytics-join-alert");
+                        String raw = messagesConfig.getPrefix() + template
+                                .replace("{PLAYER}", player.getName())
+                                .replace("{DETECTIONS_COLORED}", detectionsColored)
+                                .replace("{DETECTIONS}", String.valueOf(result.getTotalDetections()));
+                        String message = ColorUtil.colorize(raw);
+
+                        SchedulerManager.getAdapter().runSync(() -> {
+                            for (org.bukkit.entity.Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
+                                if (online.hasPermission(Permissions.ALERTS)
+                                        || online.hasPermission(Permissions.ADMIN)) {
+                                    online.sendMessage(message);
+                                }
+                            }
+                            if (config.isAiConsoleAlerts()) {
+                                plugin.getLogger().info(ColorUtil.stripColors(raw));
+                            }
+                        });
+                    }
+                });
+            }
         }
     }
 

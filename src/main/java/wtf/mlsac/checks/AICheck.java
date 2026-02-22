@@ -204,43 +204,52 @@ public class AICheck {
     }
 
     private void sendDataToAI(Player player, AIPlayerData data) {
-        List<TickData> ticks = data.getTickBuffer();
-        if (ticks.size() < sequence) {
-            plugin.debug("[AI] Not enough ticks for " + player.getName() +
-                    ": " + ticks.size() + "/" + sequence);
-            return;
-        }
-        IAIClient client = clientProvider.get();
-        if (client == null) {
-            return;
-        }
-        plugin.debug("[AI] Sending " + ticks.size() + " ticks for " + player.getName() +
-                " (ticksSinceAttack=" + data.getTicksSinceAttack() + ")");
-        if (config.isDebug()) {
-            plugin.debug("[AI] === TICK BUFFER START ===");
-            int i = 0;
-            for (TickData tick : ticks) {
-                plugin.debug("[AI] Tick[" + i + "]: dYaw=" + String.format("%.4f", tick.deltaYaw) +
-                        ", dPitch=" + String.format("%.4f", tick.deltaPitch) +
-                        ", aYaw=" + String.format("%.4f", tick.accelYaw) +
-                        ", aPitch=" + String.format("%.4f", tick.accelPitch) +
-                        ", jYaw=" + String.format("%.4f", tick.jerkYaw) +
-                        ", jPitch=" + String.format("%.4f", tick.jerkPitch) +
-                        ", gcdYaw=" + String.format("%.4f", tick.gcdErrorYaw) +
-                        ", gcdPitch=" + String.format("%.4f", tick.gcdErrorPitch));
-                i++;
+        try {
+            List<TickData> ticks = data.getTickBuffer();
+            if (ticks.size() < sequence) {
+                plugin.debug("[AI] Not enough ticks for " + player.getName() +
+                        ": " + ticks.size() + "/" + sequence);
+                data.setPendingRequest(false);
+                return;
             }
-            plugin.debug("[AI] === TICK BUFFER END ===");
+            IAIClient client = clientProvider.get();
+            if (client == null) {
+                plugin.debug("[AI] Client unavailable (null) for " + player.getName());
+                data.setPendingRequest(false);
+                return;
+            }
+            plugin.debug("[AI] Sending " + ticks.size() + " ticks for " + player.getName() +
+                    " (ticksSinceAttack=" + data.getTicksSinceAttack() + ")");
+            if (config.isDebug()) {
+                plugin.debug("[AI] === TICK BUFFER START ===");
+                int i = 0;
+                for (TickData tick : ticks) {
+                    plugin.debug("[AI] Tick[" + i + "]: dYaw=" + String.format("%.4f", tick.deltaYaw) +
+                            ", dPitch=" + String.format("%.4f", tick.deltaPitch) +
+                            ", aYaw=" + String.format("%.4f", tick.accelYaw) +
+                            ", aPitch=" + String.format("%.4f", tick.accelPitch) +
+                            ", jYaw=" + String.format("%.4f", tick.jerkYaw) +
+                            ", jPitch=" + String.format("%.4f", tick.jerkPitch) +
+                            ", gcdYaw=" + String.format("%.4f", tick.gcdErrorYaw) +
+                            ", gcdPitch=" + String.format("%.4f", tick.gcdErrorPitch));
+                    i++;
+                }
+                plugin.debug("[AI] === TICK BUFFER END ===");
+            }
+            byte[] serialized = FlatBufferSerializer.serialize(ticks);
+            final UUID playerUuid = player.getUniqueId();
+            final String playerName = player.getName();
+            client.predict(serialized, playerUuid.toString(), playerName)
+                    .subscribe(response -> {
+                        schedulerAdapter.runSync(() -> processResponse(playerUuid, playerName, data, response));
+                    }, error -> {
+                        handleError(playerName, data, error);
+                    });
+        } catch (Exception e) {
+            plugin.getLogger().warning("[AI] Unexpected error in sendDataToAI: " + e.getMessage());
+            e.printStackTrace();
+            data.setPendingRequest(false);
         }
-        byte[] serialized = FlatBufferSerializer.serialize(ticks);
-        final UUID playerUuid = player.getUniqueId();
-        final String playerName = player.getName();
-        client.predict(serialized, playerUuid.toString(), playerName)
-                .subscribe(response -> {
-                    schedulerAdapter.runSync(() -> processResponse(playerUuid, playerName, data, response));
-                }, error -> {
-                    handleError(playerName, data, error);
-                });
     }
 
     private boolean isClientAvailable() {

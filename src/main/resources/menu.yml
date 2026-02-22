@@ -8,6 +8,7 @@ gui:
       lore:
         - "&8&m------------------------"
         - "&7AVG Probability: {AVG_PROB}"
+        - "&7DB Detections: {DETECTIONS}"
         - "&7History (Last {HISTORY_SIZE}):"
         - "{HISTORY}"
         - "&8&m------------------------"
