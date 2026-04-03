@@ -42,6 +42,7 @@ public class SuspectsMenu implements Listener {
     private final AICheck aiCheck;
     private final AnalyticsClient analyticsClient;
     private final Config pluginConfig;
+    private List<SuspectData> currentPageData = new ArrayList<>();
     private int page = 0;
     private static final int ITEMS_PER_PAGE = 45;
 
@@ -128,6 +129,7 @@ public class SuspectsMenu implements Listener {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenRun(() -> {
                 SchedulerManager.getAdapter().runSync(() -> {
                     inventory.clear();
+                    currentPageData = new ArrayList<>(pageData);
                     org.bukkit.configuration.file.FileConfiguration config = ((Main) plugin).getMenuConfig()
                             .getConfig();
 
@@ -193,13 +195,6 @@ public class SuspectsMenu implements Listener {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) head.getItemMeta();
         if (meta != null) {
-            Player suspect = Bukkit.getPlayer(data.uuid);
-            if (suspect != null && suspect.isOnline()) {
-                meta.setOwningPlayer(suspect);
-            } else {
-                meta.setOwningPlayer(Bukkit.getOfflinePlayer(data.uuid));
-            }
-
             String nameFormat = config.getString("gui.items.suspect_head.name", "&c{PLAYER}");
             meta.setDisplayName(ColorUtil.colorize(nameFormat.replace("{PLAYER}", data.name)));
 
@@ -294,26 +289,27 @@ public class SuspectsMenu implements Listener {
             return;
         }
 
-        ItemMeta meta = item.getItemMeta();
-        if (meta instanceof SkullMeta) {
-            SkullMeta skullMeta = (SkullMeta) meta;
-            Player target = skullMeta.getOwningPlayer() != null ? skullMeta.getOwningPlayer().getPlayer() : null;
+        if (event.getSlot() < 0 || event.getSlot() >= currentPageData.size()) {
+            return;
+        }
 
-            if (target != null && target.isOnline()) {
-                if (event.isLeftClick()) {
-                    admin.teleport(target);
-                    admin.sendMessage(ColorUtil.colorize(((Main) plugin).getMessagesConfig()
-                            .getMessage("suspects-teleport", "{PLAYER}", target.getName())));
-                } else if (event.isRightClick()) {
-                    admin.setGameMode(GameMode.SPECTATOR);
-                    admin.teleport(target);
-                    admin.sendMessage(ColorUtil.colorize(((Main) plugin).getMessagesConfig()
-                            .getMessage("suspects-teleport-spectator", "{PLAYER}", target.getName())));
-                }
-            } else {
-                admin.sendMessage(
-                        ColorUtil.colorize(((Main) plugin).getMessagesConfig().getMessage("suspects-player-offline")));
+        SuspectData suspectData = currentPageData.get(event.getSlot());
+        Player target = Bukkit.getPlayer(suspectData.uuid);
+
+        if (target != null && target.isOnline()) {
+            if (event.isLeftClick()) {
+                admin.teleport(target);
+                admin.sendMessage(ColorUtil.colorize(((Main) plugin).getMessagesConfig()
+                        .getMessage("suspects-teleport", "{PLAYER}", target.getName())));
+            } else if (event.isRightClick()) {
+                admin.setGameMode(GameMode.SPECTATOR);
+                admin.teleport(target);
+                admin.sendMessage(ColorUtil.colorize(((Main) plugin).getMessagesConfig()
+                        .getMessage("suspects-teleport-spectator", "{PLAYER}", target.getName())));
             }
+        } else {
+            admin.sendMessage(
+                    ColorUtil.colorize(((Main) plugin).getMessagesConfig().getMessage("suspects-player-offline")));
         }
     }
 
