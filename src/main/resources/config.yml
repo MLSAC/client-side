@@ -22,7 +22,7 @@ detection:
   enabled: false # DONT FORGET TO TURN ON (enabled: true) <---
   
   # AI server endpoint
-  endpoint: "https://api.mlsac.wtf" # Do not change!
+  endpoint: "https://api.rovex.dev" # Do not change!
   
   # API key for authentication
   # To buy API key visit https://mlsac.wtf/dashboard
