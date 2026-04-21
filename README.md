@@ -14,8 +14,6 @@
   <a href="https://github.com/MLSAC/client-side/issues">Report Bug</a>
   ·
   <a href="https://github.com/MLSAC/client-side/issues">Request Feature</a>
-  ·
-  <a href="https://discord.gg/ARVNGSTWeg">Discord</a>
 </p>
 
 <p align="center">
