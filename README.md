@@ -36,18 +36,6 @@ Any other distributions or "updates" under the name MLSAC are unofficial and not
 
 </div>
 
----
-
-## ⚖️ Legal Notice & Naming Rights (Section 7 GPLv3)
-
-This project is licensed under **GPLv3**. In accordance with **Section 7**, the original author and founder of the **MLSAC Team** imposes the following additional terms:
-
-1.  **Naming Rights:** The trade name **"MLSAC"** and its identity are proprietary. You are **NOT permitted** to use the name "MLSAC" for any derivative works, forks, or third-party distributions. Any fork must be renamed to a distinct name that does not cause confusion with the original project.
-2.  **Attribution:** All derivative works **MUST** keep the original copyright headers intact: `Copyright (C) 2026 MLSAC Team`. You may not remove or modify these lines in any existing or derived files.
-3.  **No Misrepresentation:** You may not represent any fork or third-party version as an "official" continuation, "MLSAC 2.0", or as being associated with the original **MLSAC Team** infrastructure.
-4.  **README Attribution:** All derivative works MUST include a visible acknowledgment in their README: `Based on MLSAC (https://github.com/MLSAC/client-side) by the original MLSAC Team.`
----
-
 ## ✨ Features
 
 - ⚡ **High performance** - minimal impact on server TPS
